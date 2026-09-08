@@ -114,16 +114,75 @@ class ExpenseApiIntegrationTest {
 
         mvc.perform(get("/api/reports/summary").header("Authorization", "Bearer " + alice))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.count").value(3))
-                .andExpect(jsonPath("$.total").value(1292.99));
+                .andExpect(jsonPath("$.transactionCount").value(3))
+                .andExpect(jsonPath("$.expense").value(1292.99));
 
         mvc.perform(get("/api/reports/summary").header("Authorization", "Bearer " + bob))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(500.00));
+                .andExpect(jsonPath("$.expense").value(500.00));
 
         mvc.perform(get("/api/reports/by-category").header("Authorization", "Bearer " + alice))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].percentage").exists());
+    }
+
+    @Test
+    void incomeIsTrackedSeparatelyAndDrivesTheSavingsRate() throws Exception {
+        createTransaction(alice, "100000.00", "2026-08-01", "August salary", "INCOME");
+        createTransaction(alice, "25000.00", "2026-08-05", "Rent", "EXPENSE");
+
+        mvc.perform(get("/api/reports/summary").param("from", "2026-08-01").param("to", "2026-08-31")
+                .header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.income").value(100000.00))
+                .andExpect(jsonPath("$.expense").value(25000.00))
+                .andExpect(jsonPath("$.balance").value(75000.00))
+                .andExpect(jsonPath("$.savingsRate").value(75.0));
+
+        // income must not pollute the expense-by-category breakdown
+        mvc.perform(get("/api/reports/by-category").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.category == 'Uncategorized')].total").value(org.hamcrest.Matchers
+                        .contains(25000.00)));
+
+        mvc.perform(get("/api/expenses").param("kind", "INCOME").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].kind").value("INCOME"));
+    }
+
+    @Test
+    void budgetsReportSpendingAgainstTheirLimitAndStayPrivate() throws Exception {
+        long groceries = categoryId(alice, "Groceries");
+        String month = java.time.YearMonth.now().toString();
+        createCategorisedExpense(alice, "4250.00", java.time.LocalDate.now().withDayOfMonth(1).toString(),
+                "Groceries run", groceries);
+
+        String body = mvc.perform(post("/api/budgets").header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("categoryId", groceries, "monthlyLimit", "6000.00"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long budgetId = json.readTree(body).get("id").asLong();
+
+        mvc.perform(get("/api/budgets").param("month", month).header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].spent").value(4250.00))
+                .andExpect(jsonPath("$[0].remaining").value(1750.00))
+                .andExpect(jsonPath("$[0].usedPercent").value(70.8));
+
+        // a second budget for the same category is rejected, and Bob sees none of this
+        mvc.perform(post("/api/budgets").header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("categoryId", groceries, "monthlyLimit", "9000.00"))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/budgets").header("Authorization", "Bearer " + bob))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(delete("/api/budgets/" + budgetId).header("Authorization", "Bearer " + bob))
+                .andExpect(status().isNotFound());
     }
 
     private String register(String email) throws Exception {
@@ -142,6 +201,24 @@ class ExpenseApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body).get("id").asLong();
+    }
+
+    private void createTransaction(String token, String amount, String date, String description, String kind)
+            throws Exception {
+        mvc.perform(post("/api/expenses").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("amount", amount, "spentOn", date,
+                        "description", description, "kind", kind))))
+                .andExpect(status().isCreated());
+    }
+
+    private void createCategorisedExpense(String token, String amount, String date, String description,
+            long categoryId) throws Exception {
+        mvc.perform(post("/api/expenses").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("amount", amount, "spentOn", date,
+                        "description", description, "categoryId", categoryId))))
+                .andExpect(status().isCreated());
     }
 
     private long categoryId(String token, String name) throws Exception {

@@ -1,8 +1,9 @@
-import { Alert, Box, Button, Link as MuiLink, Paper, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Link as MuiLink, Stack, TextField } from '@mui/material'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext.jsx'
+import AuthLayout from '../components/layout/AuthLayout.jsx'
 
 export default function Login() {
   const { token, login } = useAuth()
@@ -28,37 +29,34 @@ export default function Login() {
   }
 
   return (
-    <Paper component="form" onSubmit={submit} sx={{ p: 4, maxWidth: 420, mx: 'auto', mt: 6 }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
-        Sign in
-      </Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <TextField
-        label="Email"
-        type="email"
-        fullWidth
-        required
-        margin="normal"
-        value={form.email}
-        onChange={(e) => setForm({ ...form, email: e.target.value })}
-      />
-      <TextField
-        label="Password"
-        type="password"
-        fullWidth
-        required
-        margin="normal"
-        value={form.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })}
-      />
-      <Button type="submit" variant="contained" fullWidth size="large" sx={{ mt: 3 }} disabled={busy}>
-        {busy ? 'Signing in...' : 'Sign in'}
-      </Button>
-      <Box sx={{ mt: 2, textAlign: 'center' }}>
-        <MuiLink component={Link} to="/register">
-          No account? Create one
-        </MuiLink>
-      </Box>
-    </Paper>
+    <AuthLayout title="Sign in" subtitle="Welcome back. Pick up where you left off.">
+      <Stack component="form" spacing={2.5} onSubmit={submit}>
+        {error && <Alert severity="error">{error}</Alert>}
+        <TextField
+          label="Email"
+          type="email"
+          required
+          autoComplete="email"
+          value={form.email}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
+        />
+        <TextField
+          label="Password"
+          type="password"
+          required
+          autoComplete="current-password"
+          value={form.password}
+          onChange={(event) => setForm({ ...form, password: event.target.value })}
+        />
+        <Button type="submit" variant="contained" size="large" disabled={busy}>
+          {busy ? 'Signing in...' : 'Sign in'}
+        </Button>
+        <Box sx={{ textAlign: 'center' }}>
+          <MuiLink component={Link} to="/register" underline="hover">
+            No account? Create one
+          </MuiLink>
+        </Box>
+      </Stack>
+    </AuthLayout>
   )
 }

@@ -28,10 +28,11 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ExpenseDto> search(Long userId, LocalDate from, LocalDate to, Long categoryId, String q,
-            Pageable pageable) {
+    public Page<ExpenseDto> search(Long userId, LocalDate from, LocalDate to, Expense.Kind kind, Long categoryId,
+            String q, Pageable pageable) {
+        var kinds = kind == null ? java.util.List.of(Expense.Kind.values()) : java.util.List.of(kind);
         Page<Expense> page = expenses.search(userId, from == null ? EPOCH : from, to == null ? LocalDate.now() : to,
-                categoryId, likePattern(q), pageable);
+                kinds, categoryId, likePattern(q), pageable);
         Map<Long, Category> byId = categoriesById(userId);
         return page.map(e -> toDto(e, byId));
     }
@@ -40,7 +41,7 @@ public class ExpenseService {
     public ExpenseDto create(Long userId, ExpenseRequest req) {
         Long categoryId = resolveCategory(userId, req.categoryId());
         Expense saved = expenses.save(new Expense(userId, categoryId, req.amount(), req.spentOn(),
-                req.description().trim(), Expense.Source.MANUAL));
+                req.description().trim(), Expense.Source.MANUAL, req.kindOrDefault()));
         return toDto(saved, categoriesById(userId));
     }
 
@@ -49,7 +50,7 @@ public class ExpenseService {
         Expense expense = expenses.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new NotFoundException("Expense not found"));
         expense.update(resolveCategory(userId, req.categoryId()), req.amount(), req.spentOn(),
-                req.description().trim());
+                req.description().trim(), req.kindOrDefault());
         return toDto(expenses.save(expense), categoriesById(userId));
     }
 
@@ -84,7 +85,8 @@ public class ExpenseService {
     static ExpenseDto toDto(Expense e, Map<Long, Category> categoriesById) {
         Category c = e.getCategoryId() == null ? null : categoriesById.get(e.getCategoryId());
         return new ExpenseDto(e.getId(), e.getAmount(), e.getSpentOn(), e.getDescription(), e.getCategoryId(),
-                c == null ? "Uncategorized" : c.getName(), c == null ? "#757575" : c.getColor(), e.getSource().name());
+                c == null ? "Uncategorized" : c.getName(), c == null ? "#64748B" : c.getColor(),
+                e.getSource().name(), e.getKind().name());
     }
 
     static List<ExpenseDto> toDtos(List<Expense> list, Map<Long, Category> categoriesById) {

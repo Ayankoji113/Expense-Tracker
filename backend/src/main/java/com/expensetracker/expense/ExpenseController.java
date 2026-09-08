@@ -30,10 +30,11 @@ public class ExpenseController {
     Page<ExpenseDto> list(@AuthenticationPrincipal Long userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Expense.Kind kind,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String q,
             @PageableDefault(size = 25, sort = "spentOn", direction = Sort.Direction.DESC) Pageable pageable) {
-        return service.search(userId, from, to, categoryId, q, pageable);
+        return service.search(userId, from, to, kind, categoryId, q, pageable);
     }
 
     @GetMapping("/{id}")

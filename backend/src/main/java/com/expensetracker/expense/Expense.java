@@ -31,6 +31,10 @@ public class Expense {
     @Column(nullable = false)
     private Source source;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Kind kind;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -38,24 +42,31 @@ public class Expense {
         MANUAL, CSV
     }
 
+    /** Money out (the default) or money in. */
+    public enum Kind {
+        EXPENSE, INCOME
+    }
+
     protected Expense() {
     }
 
     public Expense(Long userId, Long categoryId, BigDecimal amount, LocalDate spentOn, String description,
-            Source source) {
+            Source source, Kind kind) {
         this.userId = userId;
         this.categoryId = categoryId;
         this.amount = amount;
         this.spentOn = spentOn;
         this.description = description;
         this.source = source;
+        this.kind = kind;
     }
 
-    public void update(Long categoryId, BigDecimal amount, LocalDate spentOn, String description) {
+    public void update(Long categoryId, BigDecimal amount, LocalDate spentOn, String description, Kind kind) {
         this.categoryId = categoryId;
         this.amount = amount;
         this.spentOn = spentOn;
         this.description = description;
+        this.kind = kind;
     }
 
     public Long getId() {
@@ -84,6 +95,10 @@ public class Expense {
 
     public Source getSource() {
         return source;
+    }
+
+    public Kind getKind() {
+        return kind;
     }
 
     public Instant getCreatedAt() {

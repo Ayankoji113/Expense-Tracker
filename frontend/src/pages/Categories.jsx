@@ -1,184 +1,240 @@
-import DeleteIcon from '@mui/icons-material/Delete'
+import AddIcon from '@mui/icons-material/Add'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined'
 import {
-  Alert,
   Box,
   Button,
   Chip,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Paper,
+  Stack,
   TextField,
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import client, { errorMessage } from '../api/client'
+import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
+import { useFeedback } from '../components/common/Feedback.jsx'
+import { EmptyState, ErrorState, SectionCard, TableSkeleton } from '../components/common/States.jsx'
 
 export default function Categories() {
+  const { notify } = useFeedback()
   const [categories, setCategories] = useState([])
   const [rules, setRules] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [newCategory, setNewCategory] = useState({ name: '', color: '#1565c0' })
+  const [newCategory, setNewCategory] = useState({ name: '', color: '#2563EB' })
   const [newRule, setNewRule] = useState({ keyword: '', categoryId: '' })
+  const [busy, setBusy] = useState(false)
+  const [deleting, setDeleting] = useState(null)
 
   const load = useCallback(() => {
+    setLoading(true)
+    setError('')
     Promise.all([client.get('/categories'), client.get('/categories/rules')])
-      .then(([c, r]) => {
-        setCategories(c.data)
-        setRules(r.data)
+      .then(([categoriesResponse, rulesResponse]) => {
+        setCategories(categoriesResponse.data)
+        setRules(rulesResponse.data)
       })
       .catch((e) => setError(errorMessage(e, 'Could not load categories')))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(load, [load])
 
-  const run = async (action) => {
-    setError('')
+  const run = async (action, successMessage) => {
+    setBusy(true)
     try {
       await action()
+      notify(successMessage)
       load()
     } catch (e) {
-      setError(errorMessage(e))
+      notify(errorMessage(e), 'error')
+    } finally {
+      setBusy(false)
     }
   }
 
-  return (
-    <Box>
-      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
-        Categories and rules
-      </Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+  const confirmDelete = async () => {
+    const { kind, item } = deleting
+    const url = kind === 'category' ? `/categories/${item.id}` : `/categories/rules/${item.id}`
+    await run(() => client.delete(url), kind === 'category' ? 'Category deleted' : 'Rule deleted')
+    setDeleting(null)
+  }
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Categories
-          </Typography>
-          <Box
+  if (error && !loading) {
+    return (
+      <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+        <ErrorState message={error} onRetry={load} />
+      </Paper>
+    )
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Box>
+        <Typography variant="h5">Categories and rules</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Categories group your spending. Rules tell the CSV importer where each transaction belongs.
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' } }}>
+        <SectionCard title="Categories" subtitle="Built-in categories are shared by everyone">
+          <Stack
             component="form"
-            sx={{ display: 'flex', gap: 1, my: 2 }}
-            onSubmit={(e) => {
-              e.preventDefault()
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ mb: 2 }}
+            onSubmit={(event) => {
+              event.preventDefault()
               run(async () => {
                 await client.post('/categories', newCategory)
-                setNewCategory({ name: '', color: '#1565c0' })
-              })
+                setNewCategory({ name: '', color: '#2563EB' })
+              }, 'Category created')
             }}
           >
             <TextField
               size="small"
               label="New category"
               required
+              fullWidth
               value={newCategory.name}
-              onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+              onChange={(event) => setNewCategory({ ...newCategory, name: event.target.value })}
             />
             <TextField
               size="small"
               type="color"
-              sx={{ width: 70 }}
+              label="Colour"
               value={newCategory.color}
-              onChange={(e) => setNewCategory({ ...newCategory, color: e.target.value })}
+              onChange={(event) => setNewCategory({ ...newCategory, color: event.target.value })}
+              sx={{ width: { xs: '100%', sm: 92 } }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
-            <Button type="submit" variant="contained">
+            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy}>
               Add
             </Button>
-          </Box>
-          <List dense>
-            {categories.map((category) => (
-              <ListItem
-                key={category.id}
-                secondaryAction={
-                  category.builtIn ? (
-                    <Chip size="small" label="built-in" />
+          </Stack>
+
+          {loading ? (
+            <TableSkeleton rows={4} />
+          ) : (
+            <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+              {categories.map((category) => (
+                <Stack key={category.id} direction="row" alignItems="center" spacing={1.5} sx={{ py: 1 }}>
+                  <Box
+                    sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }}
+                    aria-hidden
+                  />
+                  <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
+                    {category.name}
+                  </Typography>
+                  {category.builtIn ? (
+                    <Chip size="small" label="built-in" variant="outlined" />
                   ) : (
                     <IconButton
-                      edge="end"
-                      aria-label={`delete ${category.name}`}
-                      onClick={() => run(() => client.delete(`/categories/${category.id}`))}
+                      size="small"
+                      aria-label={`Delete ${category.name}`}
+                      onClick={() => setDeleting({ kind: 'category', item: category })}
                     >
-                      <DeleteIcon fontSize="small" />
+                      <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
-                  )
-                }
-              >
-                <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: category.color, mr: 1.5 }} />
-                <ListItemText primary={category.name} />
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
+                  )}
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </SectionCard>
 
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Auto-categorization rules
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            On import, the longest keyword found in a description wins.
-          </Typography>
-          <Box
+        <SectionCard title="Auto-categorization rules" subtitle="On import, the longest matching keyword wins">
+          <Stack
             component="form"
-            sx={{ display: 'flex', gap: 1, my: 2 }}
-            onSubmit={(e) => {
-              e.preventDefault()
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ mb: 2 }}
+            onSubmit={(event) => {
+              event.preventDefault()
               run(async () => {
                 await client.post('/categories/rules', newRule)
                 setNewRule({ keyword: '', categoryId: '' })
-              })
+              }, 'Rule created')
             }}
           >
             <TextField
               size="small"
               label="Keyword"
               required
+              fullWidth
+              placeholder="e.g. swiggy"
               value={newRule.keyword}
-              onChange={(e) => setNewRule({ ...newRule, keyword: e.target.value })}
+              onChange={(event) => setNewRule({ ...newRule, keyword: event.target.value })}
             />
             <TextField
-              select
               size="small"
-              label="Category"
+              select
               required
-              sx={{ minWidth: 150 }}
+              label="Category"
               value={newRule.categoryId}
-              onChange={(e) => setNewRule({ ...newRule, categoryId: e.target.value })}
+              onChange={(event) => setNewRule({ ...newRule, categoryId: event.target.value })}
+              sx={{ minWidth: { sm: 150 } }}
             >
-              {categories.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
+              {categories.map((category) => (
+                <MenuItem key={category.id} value={category.id}>
+                  {category.name}
                 </MenuItem>
               ))}
             </TextField>
-            <Button type="submit" variant="contained">
+            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy}>
               Add
             </Button>
-          </Box>
-          <List dense>
-            {rules.map((rule) => (
-              <ListItem
-                key={rule.id}
-                secondaryAction={
+          </Stack>
+
+          {loading ? (
+            <TableSkeleton rows={4} />
+          ) : rules.length === 0 ? (
+            <EmptyState
+              icon={AutoAwesomeIcon}
+              title="No rules yet"
+              description="Without rules, imported rows land in Uncategorized."
+            />
+          ) : (
+            <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+              {rules.map((rule) => (
+                <Stack key={rule.id} direction="row" alignItems="center" spacing={1.5} sx={{ py: 1 }}>
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography variant="body2" noWrap>
+                      {rule.keyword}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      → {rule.categoryName}
+                    </Typography>
+                  </Box>
                   <IconButton
-                    edge="end"
-                    aria-label={`delete rule ${rule.keyword}`}
-                    onClick={() => run(() => client.delete(`/categories/rules/${rule.id}`))}
+                    size="small"
+                    aria-label={`Delete rule ${rule.keyword}`}
+                    onClick={() => setDeleting({ kind: 'rule', item: rule })}
                   >
-                    <DeleteIcon fontSize="small" />
+                    <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
-                }
-              >
-                <ListItemText primary={rule.keyword} secondary={rule.categoryName} />
-              </ListItem>
-            ))}
-            {rules.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
-                No rules yet. Everything imports as Uncategorized.
-              </Typography>
-            )}
-          </List>
-        </Paper>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </SectionCard>
       </Box>
-    </Box>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        title={deleting?.kind === 'category' ? 'Delete this category?' : 'Delete this rule?'}
+        description={
+          deleting?.kind === 'category'
+            ? `"${deleting?.item.name}" will be removed and its transactions become Uncategorized.`
+            : `Imports will stop matching "${deleting?.item.keyword}".`
+        }
+        onConfirm={confirmDelete}
+        onClose={() => setDeleting(null)}
+      />
+    </Stack>
   )
 }

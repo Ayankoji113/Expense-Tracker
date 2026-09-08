@@ -1,160 +1,293 @@
-import { Alert, Box, Card, CardContent, Paper, Skeleton, TextField, Typography } from '@mui/material'
-import { useEffect, useState } from 'react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
+import SavingsIcon from '@mui/icons-material/Savings'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import { Box, Button, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material'
+import { alpha } from '@mui/material/styles'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import client, { errorMessage } from '../api/client'
-
-const currency = (value) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(value || 0))
+import { useAuth } from '../auth/AuthContext.jsx'
+import { CategoryDonut, IncomeExpenseChart, SpendTrendChart } from '../components/charts/Charts.jsx'
+import {
+  ChartSkeleton,
+  EmptyState,
+  ErrorState,
+  SectionCard,
+  StatCardSkeleton,
+  TableSkeleton,
+} from '../components/common/States.jsx'
+import StatCard from '../components/dashboard/StatCard.jsx'
+import { Amount, CategoryChip } from '../components/transactions/TransactionList.jsx'
+import { currentMonth, formatCurrency, formatDate, formatPercent, greeting, monthRange } from '../utils/format'
 
 export default function Dashboard() {
-  const [range, setRange] = useState({ from: '', to: '' })
-  const [data, setData] = useState({ summary: null, byCategory: [], monthly: [] })
+  const { email } = useAuth()
+  const [month, setMonth] = useState(currentMonth)
+  const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const params = {}
-    if (range.from) params.from = range.from
-    if (range.to) params.to = range.to
+  const load = useCallback(() => {
+    const { from, to } = monthRange(month)
     setLoading(true)
+    setError('')
     Promise.all([
-      client.get('/reports/summary', { params }),
-      client.get('/reports/by-category', { params }),
-      client.get('/reports/monthly', { params: { months: 12 } }),
+      client.get('/reports/summary', { params: { from, to } }),
+      client.get('/reports/by-category', { params: { from, to } }),
+      client.get('/reports/monthly', { params: { months: 6 } }),
+      client.get('/reports/daily', { params: { from, to } }),
+      client.get('/expenses', { params: { from, to, page: 0, size: 5 } }),
+      client.get('/budgets', { params: { month } }),
     ])
-      .then(([summary, byCategory, monthly]) =>
-        setData({ summary: summary.data, byCategory: byCategory.data, monthly: monthly.data }),
+      .then(([summary, byCategory, monthly, daily, recent, budgets]) =>
+        setData({
+          summary: summary.data,
+          byCategory: byCategory.data,
+          monthly: monthly.data,
+          daily: daily.data,
+          recent: recent.data.content,
+          budgets: budgets.data,
+        }),
       )
-      .catch((e) => setError(errorMessage(e, 'Could not load reports')))
+      .catch((e) => setError(errorMessage(e, 'Could not load your dashboard')))
       .finally(() => setLoading(false))
-  }, [range])
+  }, [month])
 
-  const { summary, byCategory, monthly } = data
+  useEffect(load, [load])
+
+  const summary = data?.summary
+  const name = (email || '').split('@')[0]
+
+  return (
+    <Stack spacing={3}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        justifyContent="space-between"
+        spacing={2}
+      >
+        <Box>
+          <Typography variant="h5">
+            {greeting()}
+            {name ? `, ${name}` : ''}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Here is your financial overview.
+          </Typography>
+        </Box>
+        <TextField
+          label="Month"
+          type="month"
+          size="small"
+          value={month}
+          onChange={(event) => setMonth(event.target.value || currentMonth())}
+          slotProps={{ inputLabel: { shrink: true } }}
+          sx={{ width: { xs: '100%', sm: 190 } }}
+        />
+      </Stack>
+
+      {error && !loading ? (
+        <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+          <ErrorState message={error} onRetry={load} />
+        </Paper>
+      ) : (
+        <>
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+            }}
+          >
+            {loading ? (
+              Array.from({ length: 4 }, (_, index) => <StatCardSkeleton key={index} />)
+            ) : (
+              <>
+                <StatCard
+                  tone="primary"
+                  icon={AccountBalanceWalletIcon}
+                  label="Net balance"
+                  value={formatCurrency(summary.balance)}
+                  caption="Income minus expenses"
+                />
+                <StatCard
+                  tone="success"
+                  icon={TrendingUpIcon}
+                  label="Income"
+                  value={formatCurrency(summary.income)}
+                  change={summary.incomeChangePercent}
+                  caption="No income recorded yet"
+                />
+                <StatCard
+                  tone="error"
+                  icon={TrendingDownIcon}
+                  label="Expenses"
+                  value={formatCurrency(summary.expense)}
+                  change={summary.expenseChangePercent}
+                  invertChange
+                  caption={`${summary.transactionCount} transactions`}
+                />
+                <StatCard
+                  tone="secondary"
+                  icon={SavingsIcon}
+                  label="Savings rate"
+                  value={formatPercent(summary.savingsRate)}
+                  caption={summary.savingsRate === null ? 'Add income to see this' : 'Of income kept this month'}
+                />
+              </>
+            )}
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
+            <SectionCard title="Income vs expenses" subtitle="Last 6 months">
+              {loading ? (
+                <ChartSkeleton />
+              ) : data.monthly.length === 0 ? (
+                <EmptyState title="Nothing to chart yet" description="Add transactions to see monthly trends." />
+              ) : (
+                <IncomeExpenseChart data={data.monthly} />
+              )}
+            </SectionCard>
+
+            <SectionCard title="Spending by category" subtitle="Selected month">
+              {loading ? (
+                <ChartSkeleton />
+              ) : data.byCategory.length === 0 ? (
+                <EmptyState title="No spending this month" description="Categorised expenses will appear here." />
+              ) : (
+                <CategoryDonut data={data.byCategory} />
+              )}
+            </SectionCard>
+          </Box>
+
+          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
+            <SectionCard title="Daily spending" subtitle="Day by day through the month">
+              {loading ? (
+                <ChartSkeleton height={240} />
+              ) : data.daily.length === 0 ? (
+                <EmptyState title="No spending recorded" description="Days you spend on will show up here." />
+              ) : (
+                <SpendTrendChart data={data.daily} height={240} />
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Budget progress"
+              subtitle="Selected month"
+              action={
+                <Button component={Link} to="/budgets" size="small">
+                  Manage
+                </Button>
+              }
+            >
+              {loading ? (
+                <TableSkeleton rows={3} />
+              ) : data.budgets.length === 0 ? (
+                <EmptyState
+                  icon={SavingsIcon}
+                  title="No budgets set"
+                  description="Set a monthly limit per category to see how much room is left."
+                  action={
+                    <Button component={Link} to="/budgets" variant="outlined" size="small">
+                      Add a budget
+                    </Button>
+                  }
+                />
+              ) : (
+                <Stack spacing={2}>
+                  {data.budgets.slice(0, 4).map((budget) => (
+                    <BudgetBar key={budget.id} budget={budget} />
+                  ))}
+                </Stack>
+              )}
+            </SectionCard>
+          </Box>
+
+          <SectionCard
+            title="Recent transactions"
+            action={
+              <Button component={Link} to="/transactions" size="small">
+                View all
+              </Button>
+            }
+          >
+            {loading ? (
+              <TableSkeleton rows={4} />
+            ) : data.recent.length === 0 ? (
+              <EmptyState
+                icon={ReceiptLongIcon}
+                title="No transactions this month"
+                description="Add your first transaction, or import a bank CSV to get started."
+                action={
+                  <Button component={Link} to="/transactions" variant="contained" size="small">
+                    Add transaction
+                  </Button>
+                }
+              />
+            ) : (
+              <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+                {data.recent.map((transaction) => (
+                  <Stack key={transaction.id} direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.25 }}>
+                    <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap>
+                        {transaction.description}
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                        <CategoryChip transaction={transaction} />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatDate(transaction.spentOn)}
+                        </Typography>
+                      </Stack>
+                    </Box>
+                    <Amount transaction={transaction} />
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+          </SectionCard>
+        </>
+      )}
+    </Stack>
+  )
+}
+
+/** Green under 70%, amber to 90%, red past that - and the same story in words. */
+export function BudgetBar({ budget, showName = true }) {
+  const used = Number(budget.usedPercent)
+  const tone = used >= 90 ? 'error' : used >= 70 ? 'warning' : 'success'
+  const remaining = Number(budget.remaining)
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, flexGrow: 1 }}>
-          Dashboard
+      <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.5 }}>
+        {showName && (
+          <Typography variant="body2" fontWeight={600} noWrap>
+            {budget.categoryName}
+          </Typography>
+        )}
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ ml: 'auto' }}>
+          {formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}
         </Typography>
-        <TextField
-          label="From"
-          type="date"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-          value={range.from}
-          onChange={(e) => setRange({ ...range, from: e.target.value })}
-        />
-        <TextField
-          label="To"
-          type="date"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-          value={range.to}
-          onChange={(e) => setRange({ ...range, to: e.target.value })}
-        />
-      </Box>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, mb: 3 }}>
-        <Stat label="Total spent" value={loading ? null : currency(summary?.total)} />
-        <Stat label="Transactions" value={loading ? null : String(summary?.count ?? 0)} />
-        <Stat label="Average" value={loading ? null : currency(summary?.average)} />
-        <Stat label="Top category" value={loading ? null : summary?.topCategory || '--'} />
-      </Box>
-
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
-        <Panel title="Spending by category">
-          {byCategory.length === 0 ? (
-            <Empty loading={loading} />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                {/* animation off: Recharts marks stay at their zero state under React StrictMode */}
-                <Pie
-                  data={byCategory}
-                  dataKey="total"
-                  nameKey="category"
-                  outerRadius={100}
-                  isAnimationActive={false}
-                  label={({ percent }) => (percent > 0.05 ? `${Math.round(percent * 100)}%` : '')}
-                >
-                  {byCategory.map((slice) => (
-                    <Cell key={slice.category} fill={slice.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => currency(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </Panel>
-
-        <Panel title="Monthly spend">
-          {monthly.length === 0 ? (
-            <Empty loading={loading} />
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthly}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" />
-                <YAxis width={70} />
-                <Tooltip formatter={(value) => currency(value)} />
-                <Bar dataKey="total" fill="#1565c0" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Panel>
-      </Box>
-    </Box>
-  )
-}
-
-function Stat({ label, value }) {
-  return (
-    <Card variant="outlined">
-      <CardContent>
-        <Typography variant="body2" color="text.secondary">
-          {label}
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={Math.min(used, 100)}
+        color={tone}
+        aria-label={`${budget.categoryName} budget, ${used.toFixed(0)} percent used`}
+        sx={{ bgcolor: (theme) => alpha(theme.palette[tone].main, 0.14) }}
+      />
+      <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mt: 0.5 }}>
+        <Typography variant="caption" color={`${tone}.main`} fontWeight={600}>
+          {formatPercent(used, { fractionDigits: 0 })} used
         </Typography>
-        <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5 }}>
-          {value === null ? <Skeleton width="70%" /> : value}
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {remaining >= 0
+            ? `${formatCurrency(remaining)} remaining`
+            : `${formatCurrency(Math.abs(remaining))} over budget`}
         </Typography>
-      </CardContent>
-    </Card>
-  )
-}
-
-function Panel({ title, children }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-        {title}
-      </Typography>
-      {children}
-    </Paper>
-  )
-}
-
-function Empty({ loading }) {
-  return (
-    <Box sx={{ height: 300, display: 'grid', placeItems: 'center' }}>
-      {loading ? <Skeleton variant="rounded" width="90%" height={260} /> : (
-        <Typography color="text.secondary">No expenses in this range yet</Typography>
-      )}
+      </Stack>
     </Box>
   )
 }

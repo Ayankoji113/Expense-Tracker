@@ -97,7 +97,8 @@ public class CsvImportService {
                         continue;
                     }
                     Long categoryId = keywordRules.categoryFor(description, fallback);
-                    expenses.save(new Expense(userId, categoryId, amount, date, description, Expense.Source.CSV));
+                    expenses.save(new Expense(userId, categoryId, amount, date, description, Expense.Source.CSV,
+                            Expense.Kind.EXPENSE));
                     imported++;
                 } catch (IllegalArgumentException e) {
                     errors.add(new ImportSummary.RowError(lineNumber, e.getMessage()));

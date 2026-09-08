@@ -36,13 +36,29 @@ public class ReportController {
         return service.monthly(userId, months);
     }
 
-    public record Summary(BigDecimal total, long count, BigDecimal average, String topCategory, LocalDate from,
-            LocalDate to) {
+    @GetMapping("/daily")
+    List<DailyPoint> daily(@AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.daily(userId, from, to);
+    }
+
+    /**
+     * Everything the dashboard header needs. {@code changePercent} fields compare the range with the
+     * one of equal length immediately before it, and are null when there is nothing to compare to.
+     */
+    public record Summary(BigDecimal income, BigDecimal expense, BigDecimal balance, BigDecimal savingsRate,
+            long transactionCount, BigDecimal averageExpense, BigDecimal averageDailyExpense,
+            BigDecimal largestExpense, String topCategory, BigDecimal incomeChangePercent,
+            BigDecimal expenseChangePercent, LocalDate from, LocalDate to) {
     }
 
     public record CategorySlice(String category, String color, BigDecimal total, long count, BigDecimal percentage) {
     }
 
-    public record MonthlyPoint(String month, BigDecimal total) {
+    public record MonthlyPoint(String month, BigDecimal income, BigDecimal expense) {
+    }
+
+    public record DailyPoint(String day, BigDecimal expense) {
     }
 }
