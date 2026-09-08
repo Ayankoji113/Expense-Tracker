@@ -1,0 +1,174 @@
+package com.expensetracker;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
+
+/** Register -> log in -> create -> import CSV -> report, against a real Postgres. */
+@Import(TestcontainersConfiguration.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+class ExpenseApiIntegrationTest {
+
+    private static final String CSV = """
+            Date,Description,Amount,Balance
+            2026-08-01,WHOLE FOODS MKT 1042,86.24,1420.11
+            2026-08-03,STARBUCKS STORE 227,6.75,1398.46
+            2026-13-45,BROKEN DATE ROW,10.00,0
+            2026-08-05,RENT AUGUST,1200.00,198.46
+            """;
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private ObjectMapper json;
+
+    private String alice;
+    private String bob;
+
+    @BeforeEach
+    void registerUsers() throws Exception {
+        alice = register("alice-" + System.nanoTime() + "@test.com");
+        bob = register("bob-" + System.nanoTime() + "@test.com");
+    }
+
+    @Test
+    void rejectsAnonymousAndBadlyAuthenticatedRequests() throws Exception {
+        mvc.perform(get("/api/expenses")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/expenses").header("Authorization", "Bearer nonsense"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void validatesTheExpensePayload() throws Exception {
+        mvc.perform(post("/api/expenses").header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"amount": -5, "spentOn": "2026-08-01", "description": ""}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("amount")));
+    }
+
+    @Test
+    void oneUserCannotSeeOrDeleteAnotherUsersExpense() throws Exception {
+        long expenseId = createExpense(alice, "42.50", "2026-08-01", "Whole Foods run");
+
+        mvc.perform(get("/api/expenses/" + expenseId).header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/expenses/" + expenseId).header("Authorization", "Bearer " + bob))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/expenses/" + expenseId).header("Authorization", "Bearer " + bob))
+                .andExpect(status().isNotFound());
+
+        // Bob's own list stays empty even though Alice has data
+        mvc.perform(get("/api/expenses").header("Authorization", "Bearer " + bob))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void importsValidRowsCategorisesThemAndReportsTheBrokenOnes() throws Exception {
+        long groceries = categoryId(alice, "Groceries");
+        createRule(alice, "whole foods", groceries);
+
+        JsonNode summary = importCsv(alice, CSV);
+        assertThat(summary.get("imported").asInt()).isEqualTo(3);
+        assertThat(summary.get("duplicates").asInt()).isZero();
+        assertThat(summary.get("failed").asInt()).isEqualTo(1);
+        assertThat(summary.get("rowErrors").get(0).get("row").asInt()).isEqualTo(4);
+        assertThat(summary.get("ignoredColumns").get(0).asText()).isEqualTo("Balance");
+
+        // the rule applied, and the untouched rows fell back to Uncategorized
+        mvc.perform(get("/api/expenses").param("q", "whole foods").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].categoryName").value("Groceries"));
+
+        // re-importing the same file changes nothing
+        JsonNode second = importCsv(alice, CSV);
+        assertThat(second.get("imported").asInt()).isZero();
+        assertThat(second.get("duplicates").asInt()).isEqualTo(3);
+    }
+
+    @Test
+    void reportsAddUpAndStayScopedToTheUser() throws Exception {
+        importCsv(alice, CSV);
+        createExpense(bob, "500.00", "2026-08-02", "Bobs rent");
+
+        mvc.perform(get("/api/reports/summary").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(3))
+                .andExpect(jsonPath("$.total").value(1292.99));
+
+        mvc.perform(get("/api/reports/summary").header("Authorization", "Bearer " + bob))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(500.00));
+
+        mvc.perform(get("/api/reports/by-category").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].percentage").exists());
+    }
+
+    private String register(String email) throws Exception {
+        String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("email", email, "password", "password123"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body).get("token").asText();
+    }
+
+    private long createExpense(String token, String amount, String date, String description) throws Exception {
+        String body = mvc.perform(post("/api/expenses").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("amount", amount, "spentOn", date, "description", description))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body).get("id").asLong();
+    }
+
+    private long categoryId(String token, String name) throws Exception {
+        String body = mvc.perform(get("/api/categories").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (JsonNode category : json.readTree(body)) {
+            if (category.get("name").asText().equals(name)) {
+                return category.get("id").asLong();
+            }
+        }
+        throw new AssertionError("no category named " + name);
+    }
+
+    private void createRule(String token, String keyword, long categoryId) throws Exception {
+        mvc.perform(post("/api/categories/rules").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("keyword", keyword, "categoryId", categoryId))))
+                .andExpect(status().isCreated());
+    }
+
+    private JsonNode importCsv(String token, String csv) throws Exception {
+        var file = new MockMultipartFile("file", "transactions.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+        String body = mvc.perform(multipart("/api/expenses/import").file(file)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.readTree(body);
+    }
+}
