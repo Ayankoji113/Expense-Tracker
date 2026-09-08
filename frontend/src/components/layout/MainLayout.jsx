@@ -7,6 +7,7 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import SavingsIcon from '@mui/icons-material/Savings'
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
 import WalletIcon from '@mui/icons-material/AccountBalanceWallet'
 import {
@@ -41,6 +42,7 @@ const NAV = [
   { to: '/analytics', label: 'Analytics', icon: BarChartIcon },
   { to: '/categories', label: 'Categories', icon: LocalOfferIcon },
   { to: '/import', label: 'Import CSV', icon: UploadFileIcon },
+  { to: '/profile', label: 'Profile', icon: PersonOutlineIcon },
 ]
 
 const TITLES = Object.fromEntries(NAV.map((item) => [item.to, item.label]))
@@ -121,7 +123,8 @@ export default function MainLayout({ mode, onToggleMode }) {
 }
 
 function SidebarContent({ pathname, onNavigate }) {
-  const { email, logout } = useAuth()
+  const { user, email, logout } = useAuth()
+  const displayName = user?.username ? `@${user.username}` : email
 
   return (
     <Stack sx={{ height: '100%' }}>
@@ -180,15 +183,18 @@ function SidebarContent({ pathname, onNavigate }) {
 
       <Divider />
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 2 }}>
-        <Avatar sx={{ width: 34, height: 34, bgcolor: 'secondary.main', fontSize: 14 }}>
-          {(email || '?').slice(0, 1).toUpperCase()}
+        <Avatar
+          src={user?.avatarUrl || undefined}
+          sx={{ width: 34, height: 34, bgcolor: 'secondary.main', fontSize: 14 }}
+        >
+          {(user?.username || email || '?').slice(0, 1).toUpperCase()}
         </Avatar>
         <Box sx={{ minWidth: 0, flexGrow: 1 }}>
           <Typography variant="body2" noWrap title={email}>
-            {email}
+            {displayName}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Signed in
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+            {email}
           </Typography>
         </Box>
         <Tooltip title="Log out">

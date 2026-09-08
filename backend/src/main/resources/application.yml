@@ -27,6 +27,10 @@ app:
     ttl-hours: ${JWT_TTL_HOURS:24}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+  google:
+    # from Google Cloud Console > Credentials > OAuth client ID (Web application).
+    # Leave empty to run with email/password sign-in only.
+    client-id: ${GOOGLE_CLIENT_ID:}
 
 logging:
   level:

@@ -46,8 +46,8 @@ class ExpenseApiIntegrationTest {
 
     @BeforeEach
     void registerUsers() throws Exception {
-        alice = register("alice-" + System.nanoTime() + "@test.com");
-        bob = register("bob-" + System.nanoTime() + "@test.com");
+        alice = register("alice" + System.nanoTime() + "@test.com");
+        bob = register("bob" + System.nanoTime() + "@test.com");
     }
 
     @Test
@@ -187,7 +187,8 @@ class ExpenseApiIntegrationTest {
 
     private String register(String email) throws Exception {
         String body = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(java.util.Map.of("email", email, "password", "password123"))))
+                .content(json.writeValueAsString(java.util.Map.of("email", email, "password", "password123",
+                        "username", email.split("@")[0].replace("-", "")))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return json.readTree(body).get("token").asText();

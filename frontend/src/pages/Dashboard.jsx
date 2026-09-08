@@ -23,7 +23,7 @@ import { Amount, CategoryChip } from '../components/transactions/TransactionList
 import { currentMonth, formatCurrency, formatDate, formatPercent, greeting, monthRange } from '../utils/format'
 
 export default function Dashboard() {
-  const { email } = useAuth()
+  const { user, email } = useAuth()
   const [month, setMonth] = useState(currentMonth)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -58,7 +58,7 @@ export default function Dashboard() {
   useEffect(load, [load])
 
   const summary = data?.summary
-  const name = (email || '').split('@')[0]
+  const name = user?.username || (email || '').split('@')[0]
 
   return (
     <Stack spacing={3}>

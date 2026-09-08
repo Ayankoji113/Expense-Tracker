@@ -24,6 +24,8 @@ Register an account, add a few keyword rules on the **Categories** page (`big ba
 | Feature | Detail |
 | --- | --- |
 | Multi-user auth | Register / login, BCrypt hashes, stateless JWT, every query scoped to the authenticated user |
+| Google sign-in | Optional: Google Identity Services button, ID token verified server-side against Google's keys |
+| User profile | Unique username and optional age, editable in-app; Google accounts get a username derived from their email |
 | Income and expenses | Both tracked, with net balance and savings rate per month |
 | Transactions | Server-side pagination, search, type / category / date-range filters, inline add-edit-delete |
 | CSV import | Header mapping, several date formats, duplicate detection, per-row error reporting |
@@ -45,6 +47,7 @@ Amounts are formatted as Indian Rupees throughout (`₹1,25,000`) via a single `
 
 ![Transactions](docs/transactions.jpg)
 ![Budgets in dark mode](docs/budgets-dark.jpg)
+![Profile](docs/profile.jpg)
 
 ## Stack
 
@@ -62,7 +65,10 @@ All endpoints except `/api/auth/**` need `Authorization: Bearer <token>`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/register`, `/api/auth/login` | Get a JWT |
+| POST | `/api/auth/register`, `/api/auth/login` | Get a JWT (register takes `username`, optional `age`) |
+| POST | `/api/auth/google` | Trade a Google ID token for a JWT |
+| GET | `/api/auth/config` | Whether Google sign-in is configured |
+| GET / PUT | `/api/profile` | Read or update username and age |
 | GET | `/api/expenses?from&to&kind&categoryId&q&page&size` | Paged, filtered transactions |
 | POST / PUT / DELETE | `/api/expenses[/{id}]` | Create, update, delete (`kind` = `EXPENSE` or `INCOME`) |
 | POST | `/api/expenses/import` | Multipart CSV upload, returns an import summary |
@@ -71,13 +77,40 @@ All endpoints except `/api/auth/**` need `Authorization: Bearer <token>`.
 | GET / POST / PUT / DELETE | `/api/budgets[/{id}]?month=YYYY-MM` | Budgets with spend measured against the limit |
 | GET | `/api/reports/summary`, `/by-category`, `/monthly`, `/daily` | Dashboard and analytics aggregates |
 
+## Google sign-in (optional)
+
+The app runs on email and password out of the box. To add the "Continue with Google" button:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials) create (or pick) a project,
+   then **Create credentials → OAuth client ID → Web application**.
+2. Under **Authorised JavaScript origins** add the origins you serve the app from — `http://localhost:5173`
+   for local use, plus your deployed URL.
+3. Copy the **Client ID** (it ends in `.apps.googleusercontent.com`; the client secret is not needed).
+4. Set it in both places and restart:
+
+```bash
+# docker compose picks up both from one variable
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com docker compose up --build
+
+# or for local development
+#   backend/  : GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com ./mvnw spring-boot:run
+#   frontend/ : put VITE_GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com in .env.development
+```
+
+The browser sends the Google ID token to `/api/auth/google`; the backend verifies its signature against
+Google's published keys, checks the audience and issuer, and only then issues its own JWT. No client
+secret ever reaches the browser. If the client id is missing on either side the button simply does not
+render, and the endpoint returns a clear error rather than half-working.
+
+A Google sign-in matching an existing email links to that account rather than creating a second one.
+
 ## Architecture
 
 ```
 React SPA ──HTTP/JSON──▶ Spring Boot API ──JDBC──▶ PostgreSQL
    (nginx)                JwtAuthFilter               (Flyway-managed schema)
                           feature packages:
-                          auth · expense · category · budget · importer · report
+                          auth · user · expense · category · budget · importer · report
 ```
 
 Aggregation happens in SQL, not in Java streams. Money is `BigDecimal(12,2)` end to end. The schema is
@@ -103,7 +136,8 @@ npm run dev                # http://localhost:5173, talks to VITE_API_URL
 npm test
 ```
 
-`SERVER_PORT`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_TTL_HOURS` and `CORS_ORIGINS`
+`SERVER_PORT`, `DB_URL`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_TTL_HOURS`, `CORS_ORIGINS` and
+`GOOGLE_CLIENT_ID`
 are all environment-overridable; the defaults in `application.yml` are for local development only.
 Set a real `JWT_SECRET` (32+ bytes) anywhere else.
 

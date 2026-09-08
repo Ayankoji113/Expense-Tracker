@@ -24,7 +24,7 @@ describe('Login', () => {
 
   it('stores the token returned by the API', async () => {
     vi.spyOn(client, 'post').mockResolvedValue({
-      data: { token: 'jwt-123', email: 'a@test.com', expiresAt: '2030-01-01T00:00:00Z' },
+      data: { token: 'jwt-123', expiresAt: '2030-01-01T00:00:00Z', user: { email: 'a@test.com', username: 'ada' } },
     })
 
     renderLogin()

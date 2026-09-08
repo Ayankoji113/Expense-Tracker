@@ -23,6 +23,8 @@ services:
       DB_PASSWORD: expenses
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-at-least-32-bytes-long!!}
       CORS_ORIGINS: http://localhost:5173,http://localhost:8081
+      # optional: enables Google sign-in, see README
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "8080:8080"
     depends_on:
@@ -30,7 +32,10 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "5173:80"
     depends_on:

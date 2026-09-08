@@ -2,36 +2,55 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { Navigate, useLocation } from 'react-router-dom'
 import client, { TOKEN_KEY } from '../api/client'
 
-const EMAIL_KEY = 'expense-tracker-email'
+const USER_KEY = 'expense-tracker-user'
 const AuthContext = createContext(null)
+
+function readStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY)) || null
+  } catch {
+    return null
+  }
+}
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY))
-  const [email, setEmail] = useState(() => localStorage.getItem(EMAIL_KEY))
+  const [user, setUser] = useState(readStoredUser)
 
-  const authenticate = useCallback(async (path, credentials) => {
-    const { data } = await client.post(`/auth/${path}`, credentials)
+  const store = useCallback((data) => {
     localStorage.setItem(TOKEN_KEY, data.token)
-    localStorage.setItem(EMAIL_KEY, data.email)
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user))
     setToken(data.token)
-    setEmail(data.email)
+    setUser(data.user)
     return data
   }, [])
+
+  const authenticate = useCallback(
+    async (path, payload) => store((await client.post(`/auth/${path}`, payload)).data),
+    [store],
+  )
 
   const value = useMemo(
     () => ({
       token,
-      email,
+      user,
+      email: user?.email,
       login: (credentials) => authenticate('login', credentials),
-      register: (credentials) => authenticate('register', credentials),
+      register: (details) => authenticate('register', details),
+      loginWithGoogle: (credential) => authenticate('google', { credential }),
+      // keeps the sidebar and greeting in step after a profile edit
+      setUser: (updated) => {
+        localStorage.setItem(USER_KEY, JSON.stringify(updated))
+        setUser(updated)
+      },
       logout: () => {
         localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(EMAIL_KEY)
+        localStorage.removeItem(USER_KEY)
         setToken(null)
-        setEmail(null)
+        setUser(null)
       },
     }),
-    [token, email, authenticate],
+    [token, user, authenticate],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

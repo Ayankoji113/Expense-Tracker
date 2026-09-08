@@ -11,6 +11,7 @@ import Categories from './pages/Categories.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Import from './pages/Import.jsx'
 import Login from './pages/Login.jsx'
+import Profile from './pages/Profile.jsx'
 import Register from './pages/Register.jsx'
 import Transactions from './pages/Transactions.jsx'
 import { createAppTheme } from './theme'
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/import" element={<Import />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -1,9 +1,12 @@
 package com.expensetracker.auth;
 
 import com.expensetracker.auth.AuthController.AuthResponse;
+import com.expensetracker.auth.AuthController.RegisterRequest;
 import com.expensetracker.common.BadRequestException;
+import com.expensetracker.user.ProfileService;
 import com.expensetracker.user.User;
 import com.expensetracker.user.UserRepository;
+import com.expensetracker.user.Usernames;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,24 +26,30 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse register(String email, String rawPassword) {
+    public AuthResponse register(RegisterRequest request) {
+        String email = request.email().trim();
+        String username = Usernames.normalise(request.username());
         if (users.existsByEmailIgnoreCase(email)) {
             throw new BadRequestException("Email already registered");
         }
-        User user = users.save(new User(email, encoder.encode(rawPassword)));
+        if (users.existsByUsernameIgnoreCase(username)) {
+            throw new BadRequestException("That username is taken");
+        }
+        User user = users.save(User.local(email, username, encoder.encode(request.password()), request.age()));
         return token(user);
     }
 
     @Transactional(readOnly = true)
     public AuthResponse login(String email, String rawPassword) {
         User user = users.findByEmailIgnoreCase(email)
-                .filter(u -> encoder.matches(rawPassword, u.getPasswordHash()))
+                .filter(candidate -> candidate.getPasswordHash() != null)
+                .filter(candidate -> encoder.matches(rawPassword, candidate.getPasswordHash()))
                 .orElseThrow(() -> new BadCredentialsException("bad credentials"));
         return token(user);
     }
 
-    private AuthResponse token(User user) {
-        var t = jwt.issue(user.getId(), user.getEmail());
-        return new AuthResponse(t.token(), t.expiresAt(), user.getEmail());
+    AuthResponse token(User user) {
+        var issued = jwt.issue(user.getId(), user.getEmail());
+        return new AuthResponse(issued.token(), issued.expiresAt(), ProfileService.toDto(user));
     }
 }
