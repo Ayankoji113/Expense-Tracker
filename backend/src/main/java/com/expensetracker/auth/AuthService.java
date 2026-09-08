@@ -39,9 +39,12 @@ public class AuthService {
         return token(user);
     }
 
+    /** Sign in with either the email address or the username - people remember whichever they set. */
     @Transactional(readOnly = true)
-    public AuthResponse login(String email, String rawPassword) {
-        User user = users.findByEmailIgnoreCase(email)
+    public AuthResponse login(String identifier, String rawPassword) {
+        String trimmed = identifier.trim();
+        User user = (trimmed.contains("@") ? users.findByEmailIgnoreCase(trimmed)
+                : users.findByUsernameIgnoreCase(trimmed))
                 .filter(candidate -> candidate.getPasswordHash() != null)
                 .filter(candidate -> encoder.matches(rawPassword, candidate.getPasswordHash()))
                 .orElseThrow(() -> new BadCredentialsException("bad credentials"));

@@ -67,6 +67,10 @@ public class User {
         return user;
     }
 
+    public void setPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public void updateProfile(String username, Integer age) {
         this.username = username;
         this.age = age;

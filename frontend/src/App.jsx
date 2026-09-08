@@ -3,12 +3,14 @@ import { ThemeProvider } from '@mui/material/styles'
 import { useMemo, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from './auth/AuthContext.jsx'
+import ErrorBoundary from './components/common/ErrorBoundary.jsx'
 import { FeedbackProvider } from './components/common/Feedback.jsx'
 import MainLayout from './components/layout/MainLayout.jsx'
 import Analytics from './pages/Analytics.jsx'
 import Budgets from './pages/Budgets.jsx'
 import Categories from './pages/Categories.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import ForgotPassword from './pages/ForgotPassword.jsx'
 import Import from './pages/Import.jsx'
 import Login from './pages/Login.jsx'
 import Profile from './pages/Profile.jsx'
@@ -46,9 +48,11 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <FeedbackProvider>
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             element={
               <RequireAuth>
@@ -64,8 +68,9 @@ export default function App() {
             <Route path="/import" element={<Import />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </FeedbackProvider>
     </ThemeProvider>
   )

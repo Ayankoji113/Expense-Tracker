@@ -28,13 +28,13 @@ describe('Login', () => {
     })
 
     renderLogin()
-    await userEvent.type(screen.getByLabelText(/email/i), 'a@test.com')
+    await userEvent.type(screen.getByLabelText(/username or email/i), 'a@test.com')
     await userEvent.type(screen.getByLabelText(/password/i), 'password123')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => expect(localStorage.getItem(TOKEN_KEY)).toBe('jwt-123'))
     expect(client.post).toHaveBeenCalledWith('/auth/login', {
-      email: 'a@test.com',
+      identifier: 'a@test.com',
       password: 'password123',
     })
   })
@@ -43,7 +43,7 @@ describe('Login', () => {
     vi.spyOn(client, 'post').mockRejectedValue({ response: { data: { message: 'Invalid email or password' } } })
 
     renderLogin()
-    await userEvent.type(screen.getByLabelText(/email/i), 'a@test.com')
+    await userEvent.type(screen.getByLabelText(/username or email/i), 'a@test.com')
     await userEvent.type(screen.getByLabelText(/password/i), 'wrong-password')
     await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
 

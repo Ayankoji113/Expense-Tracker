@@ -80,6 +80,26 @@ class ProfileApiTest {
     }
 
     @Test
+    void signInWorksWithEitherTheUsernameOrTheEmail() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String email = "dual" + suffix + "@test.com";
+        String username = "dual" + suffix;
+        mvc.perform(register(email, username, 30)).andExpect(status().isOk());
+
+        mvc.perform(login(username)).andExpect(status().isOk()).andExpect(jsonPath("$.user.email").value(email));
+        mvc.perform(login(username.toUpperCase())).andExpect(status().isOk());
+        mvc.perform(login(email)).andExpect(status().isOk());
+        mvc.perform(login("nobody" + suffix)).andExpect(status().isUnauthorized());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(String identifier)
+            throws Exception {
+        return post("/api/auth/login").header("X-Forwarded-For", "198.51.100." + (System.nanoTime() % 250 + 1))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("identifier", identifier, "password", "password123")));
+    }
+
+    @Test
     void googleSignInIsRejectedCleanlyWhenTheServerHasNoClientId() throws Exception {
         mvc.perform(post("/api/auth/google").contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("credential", "not-a-real-token"))))

@@ -25,6 +25,11 @@ public class ApiExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    ResponseEntity<Map<String, Object>> tooManyRequests(TooManyRequestsException ex, HttpServletRequest req) {
+        return body(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage(), req);
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     ResponseEntity<Map<String, Object>> badCredentials(BadCredentialsException ex, HttpServletRequest req) {
         return body(HttpStatus.UNAUTHORIZED, "Invalid email or password", req);

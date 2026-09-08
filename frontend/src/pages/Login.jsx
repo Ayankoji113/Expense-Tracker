@@ -1,6 +1,6 @@
 import { Alert, Box, Button, Link as MuiLink, Stack, TextField } from '@mui/material'
 import { useCallback, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext.jsx'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton.jsx'
@@ -9,9 +9,12 @@ import AuthLayout from '../components/layout/AuthLayout.jsx'
 export default function Login() {
   const { token, login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '' })
+  const location = useLocation()
+  const [form, setForm] = useState({ identifier: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // carried over from a finished password reset
+  const [notice, setNotice] = useState(location.state?.message || '')
 
   const signInWithGoogle = useCallback(
     async (credential) => {
@@ -32,6 +35,7 @@ export default function Login() {
     event.preventDefault()
     setBusy(true)
     setError('')
+    setNotice('')
     try {
       await login(form)
       navigate('/')
@@ -45,15 +49,15 @@ export default function Login() {
   return (
     <AuthLayout title="Sign in" subtitle="Welcome back. Pick up where you left off.">
       <Stack spacing={2.5}>
+        {notice && <Alert severity="success">{notice}</Alert>}
         <Stack component="form" spacing={2.5} onSubmit={submit}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
-            label="Email"
-            type="email"
+            label="Username or email"
             required
-            autoComplete="email"
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            autoComplete="username"
+            value={form.identifier}
+            onChange={(event) => setForm({ ...form, identifier: event.target.value })}
           />
           <TextField
             label="Password"
@@ -63,6 +67,11 @@ export default function Login() {
             value={form.password}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
           />
+          <Box sx={{ textAlign: 'right', mt: -1 }}>
+            <MuiLink component={Link} to="/forgot-password" underline="hover" variant="body2">
+              Forgot password?
+            </MuiLink>
+          </Box>
           <Button type="submit" variant="contained" size="large" disabled={busy}>
             {busy ? 'Signing in...' : 'Sign in'}
           </Button>

@@ -23,7 +23,8 @@ Register an account, add a few keyword rules on the **Categories** page (`big ba
 
 | Feature | Detail |
 | --- | --- |
-| Multi-user auth | Register / login, BCrypt hashes, stateless JWT, every query scoped to the authenticated user |
+| Multi-user auth | Sign in with username **or** email, BCrypt hashes, stateless JWT, every query scoped to the authenticated user |
+| Forgotten passwords | 6-digit code by email, single use, 15-minute expiry, attempt-limited |
 | Google sign-in | Optional: Google Identity Services button, ID token verified server-side against Google's keys |
 | User profile | Unique username and optional age, editable in-app; Google accounts get a username derived from their email |
 | Income and expenses | Both tracked, with net balance and savings rate per month |
@@ -65,7 +66,9 @@ All endpoints except `/api/auth/**` need `Authorization: Bearer <token>`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/register`, `/api/auth/login` | Get a JWT (register takes `username`, optional `age`) |
+| POST | `/api/auth/register` | Create an account (`username`, `email`, `password`, optional `age`) |
+| POST | `/api/auth/login` | Get a JWT (`identifier` is a username or an email) |
+| POST | `/api/auth/password/forgot`, `/api/auth/password/reset` | Email a reset code, then use it |
 | POST | `/api/auth/google` | Trade a Google ID token for a JWT |
 | GET | `/api/auth/config` | Whether Google sign-in is configured |
 | GET / PUT | `/api/profile` | Read or update username and age |
@@ -76,6 +79,23 @@ All endpoints except `/api/auth/**` need `Authorization: Bearer <token>`.
 | GET / POST / DELETE | `/api/categories/rules[/{id}]` | Auto-categorization keyword rules |
 | GET / POST / PUT / DELETE | `/api/budgets[/{id}]?month=YYYY-MM` | Budgets with spend measured against the limit |
 | GET | `/api/reports/summary`, `/by-category`, `/monthly`, `/daily` | Dashboard and analytics aggregates |
+
+## Forgotten passwords
+
+`Forgot password?` on the sign-in page emails a 6-digit code, which is exchanged for a new password.
+Only a BCrypt hash of the code is stored, it expires in 15 minutes, works once, and dies after five
+wrong guesses. Requesting a code says the same thing whether or not the address is registered, so the
+endpoint cannot be used to discover who has an account.
+
+Set SMTP to actually deliver the email:
+
+```bash
+MAIL_HOST=smtp.gmail.com MAIL_USERNAME=you@gmail.com MAIL_PASSWORD=your-app-password   MAIL_FROM=you@gmail.com docker compose up --build
+```
+
+Gmail needs an [App Password](https://support.google.com/accounts/answer/185833), not your normal one.
+**Without SMTP the flow still works**: the code is written to the server log instead of being emailed,
+and the UI says so — handy for a local demo, not something to leave in production.
 
 ## Google sign-in (optional)
 
@@ -143,7 +163,33 @@ Set a real `JWT_SECRET` (32+ bytes) anywhere else.
 
 ## Deployment
 
-The backend image is a plain `java -jar` container, so it deploys to Render / Fly / Railway from
-`backend/Dockerfile` with `DB_URL` + `JWT_SECRET` set. The frontend is static output; build it with
-`npm run build` and host `dist/` anywhere, or use `frontend/Dockerfile` for the nginx image that also
-proxies `/api` to the backend.
+Copy [`.env.example`](.env.example) to `.env` and fill it in — `docker compose` reads it automatically.
+
+```bash
+JWT_SECRET=$(openssl rand -base64 48) docker compose up --build -d
+```
+
+**Before going live**
+
+- `JWT_SECRET` — 32+ random bytes. The app **refuses to start** outside the dev profile if the sample
+  secret is still in place, so a deployment can never quietly run on it.
+- `CORS_ORIGINS` — the exact origin(s) serving the frontend, e.g. `https://expenses.example.com`.
+- `DB_URL` / `DB_USER` / `DB_PASSWORD` — a managed Postgres. Flyway applies the schema on first boot.
+- Terminate TLS at your platform or reverse proxy; the app expects `X-Forwarded-For` for rate limiting.
+- Optional: `GOOGLE_CLIENT_ID` and the `MAIL_*` variables, as described above.
+
+**What is already handled**: `/actuator/health` for platform health checks (and a compose healthcheck
+gating the frontend), the API container running as a non-root user with the JVM sized from the
+container memory limit, `restart: unless-stopped`, gzip plus immutable asset caching and a
+never-cached `index.html` in nginx, `nosniff` / `DENY` / `Referrer-Policy` headers, and per-IP rate
+limits on sign-in and password reset (10 and 5 attempts per 15 minutes).
+
+**Render** — [`render.yaml`](render.yaml) is a blueprint for the API, a static frontend and a Postgres
+instance. It generates `JWT_SECRET` for you; `DB_URL` has to be pasted once as
+`jdbc:postgresql://<internal-host>/expenses`, because Render only exposes a `postgresql://` string and
+the JDBC driver wants its own scheme. Set `VITE_API_URL` on the static site to the API's URL, and
+`CORS_ORIGINS` on the API to the site's URL.
+
+Anywhere else: the backend image is a plain `java -jar` container, and the frontend is static output —
+`npm run build` and host `dist/`, or use `frontend/Dockerfile` for the nginx image that also proxies
+`/api` to the backend.
