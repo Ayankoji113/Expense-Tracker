@@ -50,24 +50,24 @@ export default function App() {
       <FeedbackProvider>
         <ErrorBoundary>
           <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route
-            element={
-              <RequireAuth>
-                <MainLayout mode={mode} onToggleMode={toggleMode} />
-              </RequireAuth>
-            }
-          >
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/import" element={<Import />} />
-            <Route path="/profile" element={<Profile />} />
-          </Route>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <MainLayout mode={mode} onToggleMode={toggleMode} />
+                </RequireAuth>
+              }
+            >
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/import" element={<Import />} />
+              <Route path="/profile" element={<Profile />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
