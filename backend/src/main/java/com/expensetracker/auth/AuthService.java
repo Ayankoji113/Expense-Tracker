@@ -47,7 +47,7 @@ public class AuthService {
                 : users.findByUsernameIgnoreCase(trimmed))
                 .filter(candidate -> candidate.getPasswordHash() != null)
                 .filter(candidate -> encoder.matches(rawPassword, candidate.getPasswordHash()))
-                .orElseThrow(() -> new BadCredentialsException("bad credentials"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid username, email or password"));
         return token(user);
     }
 

@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Link as MuiLink, Stack, TextField } from '@mui/material'
+import { Alert, Button, Link as MuiLink, Stack, TextField, Typography } from '@mui/material'
 import { useCallback, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage } from '../api/client'
@@ -15,21 +15,23 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
   // carried over from a finished password reset
   const [notice, setNotice] = useState(location.state?.message || '')
+  // go back to the page that sent an expired session here
+  const destination = location.state?.from?.pathname || '/'
 
   const signInWithGoogle = useCallback(
     async (credential) => {
       setError('')
       try {
         await loginWithGoogle(credential)
-        navigate('/')
+        navigate(destination, { replace: true })
       } catch (e) {
         setError(errorMessage(e, 'Google sign-in failed'))
       }
     },
-    [loginWithGoogle, navigate],
+    [loginWithGoogle, navigate, destination],
   )
 
-  if (token) return <Navigate to="/" replace />
+  if (token) return <Navigate to={destination} replace />
 
   const submit = async (event) => {
     event.preventDefault()
@@ -38,7 +40,7 @@ export default function Login() {
     setNotice('')
     try {
       await login(form)
-      navigate('/')
+      navigate(destination, { replace: true })
     } catch (e) {
       setError(errorMessage(e, 'Login failed'))
     } finally {
@@ -47,14 +49,15 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Sign in" subtitle="Welcome back. Pick up where you left off.">
-      <Stack spacing={2.5}>
+    <AuthLayout title="Sign in" subtitle="Welcome back. Your ledger is where you left it.">
+      <Stack spacing={3}>
         {notice && <Alert severity="success">{notice}</Alert>}
         <Stack component="form" spacing={2.5} onSubmit={submit}>
           {error && <Alert severity="error">{error}</Alert>}
           <TextField
             label="Username or email"
             required
+            autoFocus
             autoComplete="username"
             value={form.identifier}
             onChange={(event) => setForm({ ...form, identifier: event.target.value })}
@@ -67,11 +70,6 @@ export default function Login() {
             value={form.password}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
           />
-          <Box sx={{ textAlign: 'right', mt: -1 }}>
-            <MuiLink component={Link} to="/forgot-password" underline="hover" variant="body2">
-              Forgot password?
-            </MuiLink>
-          </Box>
           <Button type="submit" variant="contained" size="large" disabled={busy}>
             {busy ? 'Signing in...' : 'Sign in'}
           </Button>
@@ -79,11 +77,18 @@ export default function Login() {
 
         <GoogleSignInButton onCredential={signInWithGoogle} onError={setError} />
 
-        <Box sx={{ textAlign: 'center' }}>
-          <MuiLink component={Link} to="/register" underline="hover">
-            No account? Create one
-          </MuiLink>
-        </Box>
+        <Stack direction="row" sx={{ flexWrap: 'wrap', justifyContent: 'space-between', gap: 1 }}>
+          <Typography variant="body2">
+            <MuiLink component={Link} to="/register">
+              Create an account
+            </MuiLink>
+          </Typography>
+          <Typography variant="body2">
+            <MuiLink component={Link} to="/forgot-password" color="text.secondary">
+              Forgot password?
+            </MuiLink>
+          </Typography>
+        </Stack>
       </Stack>
     </AuthLayout>
   )

@@ -67,9 +67,10 @@ export default function GoogleSignInButton({ onCredential, onError }) {
         window.google.accounts.id.renderButton(container.current, {
           theme: theme.palette.mode === 'dark' ? 'filled_black' : 'outline',
           size: 'large',
-          width: 340,
+          // Google wants pixels; a fixed 340 overflowed a 320px phone
+          width: Math.min(380, Math.max(200, container.current.offsetWidth)),
           text: 'continue_with',
-          shape: 'pill',
+          shape: 'rectangular',
         })
       })
       .catch((error) => onError?.(error.message))
@@ -79,7 +80,7 @@ export default function GoogleSignInButton({ onCredential, onError }) {
   }, [enabled, theme.palette.mode, onCredential, onError])
 
   if (enabled === false) return null
-  if (enabled === null) return <Skeleton variant="rounded" height={44} sx={{ borderRadius: 999 }} />
+  if (enabled === null) return <Skeleton variant="rounded" height={44} />
 
   return (
     <Box>

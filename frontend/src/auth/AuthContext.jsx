@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import client, { TOKEN_KEY } from '../api/client'
+import client, { TOKEN_KEY, USER_KEY } from '../api/client'
 
-const USER_KEY = 'expense-tracker-user'
 const AuthContext = createContext(null)
 
 function readStoredUser() {

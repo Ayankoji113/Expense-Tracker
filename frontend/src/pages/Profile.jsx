@@ -1,22 +1,9 @@
-import GoogleIcon from '@mui/icons-material/Google'
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
-import {
-  Alert,
-  Avatar,
-  Box,
-  Button,
-  Chip,
-  InputAdornment,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, Avatar, Box, Button, InputAdornment, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import client, { errorMessage } from '../api/client'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useFeedback } from '../components/common/Feedback.jsx'
-import { ErrorState, SectionCard, TableSkeleton } from '../components/common/States.jsx'
+import { ErrorState, PageHeader, SectionCard, TableSkeleton } from '../components/common/States.jsx'
 import { formatLongDate } from '../utils/format'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9._]{3,30}$/
@@ -50,7 +37,7 @@ export default function Profile() {
   const submit = async (event) => {
     event.preventDefault()
     const errors = {}
-    if (!USERNAME_PATTERN.test(form.username)) {
+    if (!USERNAME_PATTERN.test(form.username.trim())) {
       errors.username = '3-30 characters: letters, digits, dot or underscore'
     }
     if (form.age && (Number(form.age) < 13 || Number(form.age) > 120)) {
@@ -67,6 +54,7 @@ export default function Profile() {
         age: form.age ? Number(form.age) : null,
       })
       setProfile(data)
+      setForm({ username: data.username, age: data.age ?? '' })
       setUser(data)
       notify('Profile updated')
     } catch (e) {
@@ -78,7 +66,7 @@ export default function Profile() {
 
   if (error && !loading) {
     return (
-      <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+      <Paper variant="outlined">
         <ErrorState message={error} onRetry={load} />
       </Paper>
     )
@@ -87,51 +75,60 @@ export default function Profile() {
   const dirty =
     profile && (form.username !== profile.username || String(form.age ?? '') !== String(profile.age ?? ''))
 
+  const facts = profile && [
+    ['Email', profile.email],
+    ['Signs in with', profile.provider === 'GOOGLE' ? 'Google' : 'Email and password'],
+    ['Member since', formatLongDate(profile.createdAt?.slice(0, 10))],
+  ]
+
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5">Profile</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Your account details and how you appear in the app.
-        </Typography>
-      </Box>
+    <Stack spacing={3}>
+      <PageHeader eyebrow="Account" title="Profile" description="Your account details and how the app addresses you." />
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '2fr 3fr' } }}>
-        <Paper variant="outlined" sx={{ borderRadius: 4, p: 3 }}>
+      <Box sx={{ display: 'grid', gap: 3, alignItems: 'start', gridTemplateColumns: { xs: '1fr', md: '2fr 3fr' } }}>
+        <SectionCard title="Account" flush>
           {loading ? (
             <TableSkeleton rows={3} />
           ) : (
-            <Stack spacing={2} alignItems="center" textAlign="center">
-              <Avatar
-                src={profile.avatarUrl || undefined}
-                sx={{ width: 84, height: 84, bgcolor: 'secondary.main', fontSize: 32 }}
-              >
-                {profile.username.slice(0, 1).toUpperCase()}
-              </Avatar>
-              <Box>
-                <Typography variant="h6">@{profile.username}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {profile.email}
+            <>
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center', p: 2.5 }}>
+                <Avatar
+                  src={profile.avatarUrl || undefined}
+                  variant="rounded"
+                  sx={{ width: 56, height: 56, fontSize: 24, bgcolor: 'primary.main', color: 'primary.contrastText' }}
+                >
+                  {profile.username.slice(0, 1).toUpperCase()}
+                </Avatar>
+                <Typography variant="h5" component="p" noWrap>
+                  @{profile.username}
                 </Typography>
+              </Stack>
+              <Box component="dl" sx={{ m: 0 }}>
+                {facts.map(([term, detail]) => (
+                  <Stack
+                    key={term}
+                    direction="row"
+                    spacing={2}
+                    sx={{ justifyContent: 'space-between', px: 2.5, py: 1.25, borderTop: 1, borderColor: 'divider' }}
+                  >
+                    <Typography component="dt" variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
+                      {term}
+                    </Typography>
+                    <Typography component="dd" variant="body2" noWrap sx={{ m: 0 }} title={detail}>
+                      {detail}
+                    </Typography>
+                  </Stack>
+                ))}
               </Box>
-              <Chip
-                size="small"
-                icon={profile.provider === 'GOOGLE' ? <GoogleIcon /> : <LockOutlinedIcon />}
-                label={profile.provider === 'GOOGLE' ? 'Google account' : 'Email and password'}
-                variant="outlined"
-              />
-              <Typography variant="caption" color="text.secondary">
-                Member since {formatLongDate(profile.createdAt?.slice(0, 10))}
-              </Typography>
-            </Stack>
+            </>
           )}
-        </Paper>
+        </SectionCard>
 
-        <SectionCard title="Edit details" subtitle="Your username is how the app greets you">
+        <SectionCard title="Edit details">
           {loading ? (
             <TableSkeleton rows={3} />
           ) : (
-            <Stack component="form" spacing={2.5} onSubmit={submit} noValidate>
+            <Stack component="form" spacing={2.5} onSubmit={submit} noValidate sx={{ maxWidth: 420 }}>
               {saveError && <Alert severity="error">{saveError}</Alert>}
               <TextField
                 label="Username"
@@ -139,7 +136,7 @@ export default function Profile() {
                 value={form.username}
                 onChange={(event) => setForm({ ...form, username: event.target.value })}
                 error={Boolean(fieldErrors.username)}
-                helperText={fieldErrors.username}
+                helperText={fieldErrors.username || 'How the app greets you, and what you can sign in with'}
                 slotProps={{ input: { startAdornment: <InputAdornment position="start">@</InputAdornment> } }}
               />
               <TextField
@@ -151,7 +148,6 @@ export default function Profile() {
                 helperText={fieldErrors.age || 'Optional'}
                 slotProps={{ htmlInput: { min: 13, max: 120, inputMode: 'numeric' } }}
               />
-              <TextField label="Email" value={profile.email} disabled helperText="Email cannot be changed here" />
               <Box>
                 <Button type="submit" variant="contained" disabled={busy || !dirty}>
                   {busy ? 'Saving...' : 'Save changes'}

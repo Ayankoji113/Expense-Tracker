@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -183,6 +184,74 @@ class ExpenseApiIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(0));
         mvc.perform(delete("/api/budgets/" + budgetId).header("Authorization", "Bearer " + bob))
                 .andExpect(status().isNotFound());
+
+        // moving a budget onto a category that already has one is a 400, not a constraint violation
+        String other = mvc.perform(post("/api/budgets").header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("categoryId", categoryId(alice, "Dining"), "monthlyLimit", "2000.00"))))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        mvc.perform(put("/api/budgets/" + json.readTree(other).get("id").asLong())
+                .header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("categoryId", groceries, "monthlyLimit", "2000.00"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("That category already has a budget"));
+    }
+
+    @Test
+    void theSameCoffeeTwiceInOneDayIsTwoTransactionsWhenTypedByHand() throws Exception {
+        createExpense(alice, "180.00", "2026-08-01", "Chai");
+        createExpense(alice, "180.00", "2026-08-01", "Chai");
+
+        mvc.perform(get("/api/expenses").param("q", "chai").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void acceptsTodayInTimezonesAheadOfTheServerButNotTheFuture() throws Exception {
+        String tomorrowUtc = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1).toString();
+        long id = createExpense(alice, "50.00", tomorrowUtc, "Early morning in Mumbai");
+
+        // and it is not hidden by the default date range
+        mvc.perform(get("/api/expenses").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(id));
+
+        String nextWeek = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(7).toString();
+        mvc.perform(post("/api/expenses").header("Authorization", "Bearer " + alice)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(
+                        java.util.Map.of("amount", "50.00", "spentOn", nextWeek, "description", "Time travel"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("future")));
+    }
+
+    @Test
+    void searchTreatsPercentAndUnderscoreAsTextNotWildcards() throws Exception {
+        createExpense(alice, "10.00", "2026-08-01", "Cashback 100% offer");
+        createExpense(alice, "20.00", "2026-08-02", "Plain groceries");
+
+        mvc.perform(get("/api/expenses").param("q", "%").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].description").value("Cashback 100% offer"));
+        mvc.perform(get("/api/expenses").param("q", "_").header("Authorization", "Bearer " + alice))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void anOverlongDescriptionFailsItsOwnRowNotTheWholeImport() throws Exception {
+        String csv = "Date,Description,Amount\n2026-08-01," + "x".repeat(300) + ",10.00\n2026-08-02,COFFEE,₹120.00\n";
+
+        JsonNode summary = importCsv(alice, csv);
+        assertThat(summary.get("imported").asInt()).isEqualTo(1);
+        assertThat(summary.get("failed").asInt()).isEqualTo(1);
+        assertThat(summary.get("rowErrors").get(0).get("row").asInt()).isEqualTo(2);
     }
 
     private String register(String email) throws Exception {

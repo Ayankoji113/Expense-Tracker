@@ -1,13 +1,13 @@
 import AddIcon from '@mui/icons-material/Add'
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
-import { Box, Button, Paper, Stack, TablePagination, Typography, useMediaQuery } from '@mui/material'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLongOutlined'
+import { Button, Paper, Stack, TablePagination, useMediaQuery } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import client, { errorMessage } from '../api/client'
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
 import { useFeedback } from '../components/common/Feedback.jsx'
-import { EmptyState, ErrorState, TableSkeleton } from '../components/common/States.jsx'
+import { EmptyState, ErrorState, PageHeader, TableSkeleton } from '../components/common/States.jsx'
 import TransactionFilters, { EMPTY_FILTERS } from '../components/transactions/TransactionFilters.jsx'
 import TransactionForm from '../components/transactions/TransactionForm.jsx'
 import { TransactionCards, TransactionTable } from '../components/transactions/TransactionList.jsx'
@@ -28,6 +28,8 @@ export default function Transactions() {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
+  // bumping this re-runs the fetch after a save or delete
+  const [revision, setRevision] = useState(0)
 
   // one request per typing pause, not per keystroke
   useEffect(() => {
@@ -40,7 +42,9 @@ export default function Transactions() {
     [filters, debouncedSearch, pagination],
   )
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    // a slow earlier response must not overwrite the result of a newer query
+    let stale = false
     const params = { page: query.page, size: query.size }
     for (const key of ['from', 'to', 'kind', 'categoryId', 'q']) {
       if (query[key]) params[key] = query[key]
@@ -49,12 +53,27 @@ export default function Transactions() {
     setError('')
     client
       .get('/expenses', { params })
-      .then(({ data }) => setResult(data))
-      .catch((e) => setError(errorMessage(e, 'Could not load transactions')))
-      .finally(() => setLoading(false))
-  }, [query])
+      .then(({ data }) => {
+        if (stale) return
+        // deleting the last row of the last page leaves that page empty: step back instead
+        if (data.content.length === 0 && query.page > 0) {
+          setPagination((current) => ({ ...current, page: Math.max(0, (data.totalPages || 1) - 1) }))
+          return
+        }
+        setResult(data)
+        setLoading(false)
+      })
+      .catch((e) => {
+        if (stale) return
+        setError(errorMessage(e, 'Could not load transactions'))
+        setLoading(false)
+      })
+    return () => {
+      stale = true
+    }
+  }, [query, revision])
 
-  useEffect(load, [load])
+  const reload = useCallback(() => setRevision((current) => current + 1), [])
 
   useEffect(() => {
     client
@@ -68,7 +87,7 @@ export default function Transactions() {
       await client.delete(`/expenses/${deleting.id}`)
       notify('Transaction deleted')
       setDeleting(null)
-      load()
+      reload()
     } catch (e) {
       notify(errorMessage(e, 'Could not delete the transaction'), 'error')
     }
@@ -80,38 +99,28 @@ export default function Transactions() {
   }
 
   const hasFilters = Object.keys(EMPTY_FILTERS).some((key) => filters[key])
+  const addButton = (
+    <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})} fullWidth>
+      Add transaction
+    </Button>
+  )
 
   return (
-    <Stack spacing={2}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        justifyContent="space-between"
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        spacing={2}
-      >
-        <Box>
-          <Typography variant="h5">Transactions</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage your income and expenses.
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setEditing({})}
-          sx={{ alignSelf: { xs: 'stretch', sm: 'center' } }}
-        >
-          Add transaction
-        </Button>
-      </Stack>
+    <Stack spacing={3}>
+      <PageHeader
+        eyebrow="Ledger"
+        title="Transactions"
+        description="Everything in and out, newest first."
+        action={addButton}
+      />
 
       <TransactionFilters filters={filters} categories={categories} onChange={changeFilters} />
 
-      <Paper variant="outlined" sx={{ borderRadius: 4, overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
         {loading ? (
           <TableSkeleton rows={6} />
         ) : error ? (
-          <ErrorState message={error} onRetry={load} />
+          <ErrorState message={error} onRetry={reload} />
         ) : result.content.length === 0 ? (
           <EmptyState
             icon={ReceiptLongIcon}
@@ -119,7 +128,7 @@ export default function Transactions() {
             description={
               hasFilters
                 ? 'Try widening the date range or clearing the filters.'
-                : 'Start tracking your spending by adding your first transaction, or import a bank CSV.'
+                : 'Add your first transaction by hand, or import a statement from your bank.'
             }
             action={
               hasFilters ? (
@@ -128,10 +137,8 @@ export default function Transactions() {
                 </Button>
               ) : (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                  <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})}>
-                    Add transaction
-                  </Button>
-                  <Button variant="outlined" component={Link} to="/import">
+                  {addButton}
+                  <Button variant="outlined" component={Link} to="/import" sx={{ flexShrink: 0 }}>
                     Import CSV
                   </Button>
                 </Stack>
@@ -165,7 +172,7 @@ export default function Transactions() {
         onSaved={(message) => {
           setEditing(null)
           notify(message)
-          load()
+          reload()
         }}
       />
 

@@ -5,6 +5,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -14,6 +18,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(NotFoundException.class)
     ResponseEntity<Map<String, Object>> notFound(NotFoundException ex, HttpServletRequest req) {
@@ -32,7 +38,23 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     ResponseEntity<Map<String, Object>> badCredentials(BadCredentialsException ex, HttpServletRequest req) {
-        return body(HttpStatus.UNAUTHORIZED, "Invalid email or password", req);
+        return body(HttpStatus.UNAUTHORIZED, ex.getMessage(), req);
+    }
+
+    /**
+     * A unique index caught something the service's own check missed, usually two requests racing.
+     * The constraint name stays in the log, not in the response.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex, HttpServletRequest req) {
+        log.warn("Constraint violation on {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        return body(HttpStatus.CONFLICT, "That conflicts with something that already exists", req);
+    }
+
+    /** ?sort=notAField */
+    @ExceptionHandler(PropertyReferenceException.class)
+    ResponseEntity<Map<String, Object>> badSort(PropertyReferenceException ex, HttpServletRequest req) {
+        return body(HttpStatus.BAD_REQUEST, "Cannot sort by " + ex.getPropertyName(), req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

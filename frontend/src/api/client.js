@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 export const TOKEN_KEY = 'expense-tracker-token'
+export const USER_KEY = 'expense-tracker-user'
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -17,6 +18,7 @@ client.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && !error.config.url.includes('/auth/')) {
       localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
       window.location.assign('/login')
     }
     return Promise.reject(error)

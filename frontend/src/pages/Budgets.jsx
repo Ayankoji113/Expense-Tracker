@@ -1,13 +1,10 @@
 import AddIcon from '@mui/icons-material/Add'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
-import SavingsIcon from '@mui/icons-material/Savings'
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogActions,
   DialogContent,
@@ -24,9 +21,11 @@ import { useCallback, useEffect, useState } from 'react'
 import client, { errorMessage } from '../api/client'
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
 import { useFeedback } from '../components/common/Feedback.jsx'
-import { EmptyState, ErrorState, TableSkeleton } from '../components/common/States.jsx'
-import { currentMonth, formatCurrency } from '../utils/format'
-import { BudgetBar } from './Dashboard.jsx'
+import { EmptyState, ErrorState, PageHeader, TableSkeleton } from '../components/common/States.jsx'
+import BudgetBar from '../components/dashboard/BudgetBar.jsx'
+import StatCard, { StatStrip } from '../components/dashboard/StatCard.jsx'
+import { mono } from '../theme'
+import { currentMonth, formatCurrency, formatMonthLong, formatPercent } from '../utils/format'
 
 export default function Budgets() {
   const { notify } = useFeedback()
@@ -65,115 +64,121 @@ export default function Budgets() {
 
   const totalLimit = budgets.reduce((sum, budget) => sum + Number(budget.monthlyLimit), 0)
   const totalSpent = budgets.reduce((sum, budget) => sum + Number(budget.spent), 0)
+  const totalLeft = totalLimit - totalSpent
 
   return (
-    <Stack spacing={2}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        justifyContent="space-between"
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        spacing={2}
-      >
-        <Box>
-          <Typography variant="h5">Budgets</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Set a monthly limit per category and track what is left.
-          </Typography>
-        </Box>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-          <TextField
-            label="Month"
-            type="month"
-            size="small"
-            value={month}
-            onChange={(event) => setMonth(event.target.value || currentMonth())}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: { xs: '100%', sm: 180 } }}
-          />
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})}>
-            Add budget
-          </Button>
-        </Stack>
-      </Stack>
+    <Stack spacing={3}>
+      <PageHeader
+        eyebrow={formatMonthLong(month)}
+        title="Budgets"
+        description="One monthly limit per category, measured against what you actually spent."
+        action={
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <TextField
+              label="Month"
+              type="month"
+              size="small"
+              value={month}
+              onChange={(event) => setMonth(event.target.value || currentMonth())}
+              slotProps={{ inputLabel: { shrink: true } }}
+              sx={{ width: { xs: '100%', sm: 180 } }}
+            />
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})}>
+              Add budget
+            </Button>
+          </Stack>
+        }
+      />
 
       {!loading && !error && budgets.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 4 }}>
-          <Typography variant="body2" color="text.secondary">
-            Across {budgets.length} {budgets.length === 1 ? 'budget' : 'budgets'} you have spent{' '}
-            <Box component="span" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {formatCurrency(totalSpent)}
-            </Box>{' '}
-            of {formatCurrency(totalLimit)} this month.
-          </Typography>
-        </Paper>
+        <StatStrip columns={3}>
+          <StatCard
+            label="Budgeted"
+            value={formatCurrency(totalLimit)}
+            caption={`${budgets.length} ${budgets.length === 1 ? 'category' : 'categories'}`}
+          />
+          <StatCard
+            label="Spent"
+            value={formatCurrency(totalSpent)}
+            caption={`${formatPercent(totalLimit ? (totalSpent / totalLimit) * 100 : 0, { fractionDigits: 0 })} of the total`}
+          />
+          <StatCard
+            label={totalLeft >= 0 ? 'Left' : 'Over'}
+            value={formatCurrency(Math.abs(totalLeft))}
+            tone={totalLeft < 0 ? 'error' : undefined}
+            caption={totalLeft >= 0 ? 'Still available' : 'Past the combined limit'}
+          />
+        </StatStrip>
       )}
 
-      {loading ? (
-        <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+        {loading ? (
           <TableSkeleton rows={3} />
-        </Paper>
-      ) : error ? (
-        <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+        ) : error ? (
           <ErrorState message={error} onRetry={load} />
-        </Paper>
-      ) : budgets.length === 0 ? (
-        <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+        ) : budgets.length === 0 ? (
           <EmptyState
-            icon={SavingsIcon}
             title="No budgets yet"
-            description="Pick a category and a monthly limit - the dashboard will then show how much room is left."
+            description="Pick a category and a monthly limit. The dashboard will then show how much room is left."
             action={
               <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({})}>
                 Add budget
               </Button>
             }
           />
-        </Paper>
-      ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-          }}
-        >
-          {budgets.map((budget) => (
-            <Card key={budget.id}>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+        ) : (
+          <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+            {budgets.map((budget) => (
+              <Box
+                key={budget.id}
+                sx={{
+                  display: 'grid',
+                  alignItems: 'center',
+                  columnGap: 3,
+                  rowGap: 1.5,
+                  px: 2.5,
+                  py: 2,
+                  gridTemplateColumns: { xs: '1fr auto', md: '220px 1fr auto' },
+                }}
+              >
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
+                  <Box
+                    aria-hidden
+                    sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: budget.categoryColor, flexShrink: 0 }}
+                  />
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="subtitle1" noWrap>
                       {budget.categoryName}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatCurrency(budget.monthlyLimit)} monthly limit
+                    <Typography variant="caption" sx={mono}>
+                      {formatCurrency(budget.monthlyLimit)} / month
                     </Typography>
                   </Box>
-                  <Box sx={{ flexShrink: 0 }}>
-                    <IconButton
-                      size="small"
-                      aria-label={`Edit ${budget.categoryName} budget`}
-                      onClick={() => setEditing(budget)}
-                    >
-                      <EditOutlinedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      aria-label={`Delete ${budget.categoryName} budget`}
-                      onClick={() => setDeleting(budget)}
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
                 </Stack>
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ gridColumn: { xs: '1 / -1', md: 'auto' }, gridRow: { xs: 2, md: 'auto' } }}>
                   <BudgetBar budget={budget} showName={false} />
                 </Box>
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
-      )}
+                <Box sx={{ flexShrink: 0 }}>
+                  <IconButton
+                    size="small"
+                    aria-label={`Edit ${budget.categoryName} budget`}
+                    onClick={() => setEditing(budget)}
+                  >
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    aria-label={`Delete ${budget.categoryName} budget`}
+                    onClick={() => setDeleting(budget)}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Box>
+            ))}
+          </Stack>
+        )}
+      </Paper>
 
       <BudgetForm
         budget={editing}
@@ -244,7 +249,9 @@ function BudgetForm({ budget, categories, existing, onClose, onSaved }) {
               label="Category"
               value={form.categoryId}
               onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
-              helperText="Each category can have one budget"
+              helperText={
+                available.length === 0 ? 'Every category already has a budget' : 'Each category can have one budget'
+              }
             >
               {available.map((category) => (
                 <MenuItem key={category.id} value={category.id}>
@@ -265,8 +272,8 @@ function BudgetForm({ budget, categories, existing, onClose, onSaved }) {
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={busy}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={onClose} disabled={busy} color="inherit">
             Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={busy || !form.categoryId}>

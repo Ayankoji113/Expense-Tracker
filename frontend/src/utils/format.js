@@ -52,8 +52,25 @@ export function formatMonthLabel(month) {
   return date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
 }
 
+/** "2026-09" -> "September 2026", for page headings. */
+export function formatMonthLong(month) {
+  if (!month) return ''
+  const [year, monthPart] = month.split('-')
+  const date = new Date(Number(year), Number(monthPart) - 1, 1)
+  return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+}
+
+/**
+ * Today's date where the user is. toISOString() would give the UTC date, which in India is still
+ * yesterday until 05:30 - enough to stop someone logging this morning's chai.
+ */
+export function today(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 export function currentMonth() {
-  return new Date().toISOString().slice(0, 7)
+  return today().slice(0, 7)
 }
 
 /** First and last day of a "YYYY-MM" month, as ISO dates. */

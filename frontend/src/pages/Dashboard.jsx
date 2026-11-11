@@ -1,10 +1,5 @@
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
-import SavingsIcon from '@mui/icons-material/Savings'
-import TrendingDownIcon from '@mui/icons-material/TrendingDown'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import { Box, Button, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material'
-import { alpha } from '@mui/material/styles'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLongOutlined'
+import { Box, Button, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import client, { errorMessage } from '../api/client'
@@ -14,13 +9,23 @@ import {
   ChartSkeleton,
   EmptyState,
   ErrorState,
+  PageHeader,
   SectionCard,
-  StatCardSkeleton,
   TableSkeleton,
 } from '../components/common/States.jsx'
-import StatCard from '../components/dashboard/StatCard.jsx'
-import { Amount, CategoryChip } from '../components/transactions/TransactionList.jsx'
-import { currentMonth, formatCurrency, formatDate, formatPercent, greeting, monthRange } from '../utils/format'
+import BudgetBar from '../components/dashboard/BudgetBar.jsx'
+import StatCard, { StatStrip, StatStripSkeleton } from '../components/dashboard/StatCard.jsx'
+import { Amount, CategoryTag } from '../components/transactions/TransactionList.jsx'
+import { mono } from '../theme'
+import {
+  currentMonth,
+  formatCurrency,
+  formatDate,
+  formatMonthLong,
+  formatPercent,
+  greeting,
+  monthRange,
+} from '../utils/format'
 
 export default function Dashboard() {
   const { user, email } = useAuth()
@@ -38,7 +43,7 @@ export default function Dashboard() {
       client.get('/reports/by-category', { params: { from, to } }),
       client.get('/reports/monthly', { params: { months: 6 } }),
       client.get('/reports/daily', { params: { from, to } }),
-      client.get('/expenses', { params: { from, to, page: 0, size: 5 } }),
+      client.get('/expenses', { params: { from, to, page: 0, size: 6 } }),
       client.get('/budgets', { params: { month } }),
     ])
       .then(([summary, byCategory, monthly, daily, recent, budgets]) =>
@@ -59,89 +64,70 @@ export default function Dashboard() {
 
   const summary = data?.summary
   const name = user?.username || (email || '').split('@')[0]
+  const viewAll = (to) => (
+    <Button component={Link} to={to} size="small" color="inherit" sx={{ color: 'text.secondary', mr: -1 }}>
+      View all
+    </Button>
+  )
 
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
-        spacing={2}
-      >
-        <Box>
-          <Typography variant="h5">
-            {greeting()}
-            {name ? `, ${name}` : ''}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Here is your financial overview.
-          </Typography>
-        </Box>
-        <TextField
-          label="Month"
-          type="month"
-          size="small"
-          value={month}
-          onChange={(event) => setMonth(event.target.value || currentMonth())}
-          slotProps={{ inputLabel: { shrink: true } }}
-          sx={{ width: { xs: '100%', sm: 190 } }}
-        />
-      </Stack>
+      <PageHeader
+        eyebrow={formatMonthLong(month)}
+        title={`${greeting()}${name ? `, ${name}` : ''}`}
+        action={
+          <TextField
+            label="Month"
+            type="month"
+            size="small"
+            value={month}
+            onChange={(event) => setMonth(event.target.value || currentMonth())}
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{ width: { xs: '100%', sm: 190 } }}
+          />
+        }
+      />
 
       {error && !loading ? (
-        <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+        <Paper variant="outlined">
           <ErrorState message={error} onRetry={load} />
         </Paper>
       ) : (
         <>
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
-            }}
-          >
-            {loading ? (
-              Array.from({ length: 4 }, (_, index) => <StatCardSkeleton key={index} />)
-            ) : (
-              <>
-                <StatCard
-                  tone="primary"
-                  icon={AccountBalanceWalletIcon}
-                  label="Net balance"
-                  value={formatCurrency(summary.balance)}
-                  caption="Income minus expenses"
-                />
-                <StatCard
-                  tone="success"
-                  icon={TrendingUpIcon}
-                  label="Income"
-                  value={formatCurrency(summary.income)}
-                  change={summary.incomeChangePercent}
-                  caption="No income recorded yet"
-                />
-                <StatCard
-                  tone="error"
-                  icon={TrendingDownIcon}
-                  label="Expenses"
-                  value={formatCurrency(summary.expense)}
-                  change={summary.expenseChangePercent}
-                  invertChange
-                  caption={`${summary.transactionCount} transactions`}
-                />
-                <StatCard
-                  tone="secondary"
-                  icon={SavingsIcon}
-                  label="Savings rate"
-                  value={formatPercent(summary.savingsRate)}
-                  caption={summary.savingsRate === null ? 'Add income to see this' : 'Of income kept this month'}
-                />
-              </>
-            )}
-          </Box>
+          {loading ? (
+            <StatStripSkeleton />
+          ) : (
+            <StatStrip>
+              <StatCard
+                label="Net balance"
+                value={formatCurrency(summary.balance)}
+                tone={Number(summary.balance) < 0 ? 'error' : undefined}
+                caption="Income minus expenses"
+              />
+              <StatCard
+                label="Income"
+                value={formatCurrency(summary.income)}
+                change={summary.incomeChangePercent}
+                caption={Number(summary.income) > 0 ? 'Nothing earlier to compare with' : 'None recorded this month'}
+              />
+              <StatCard
+                label="Expenses"
+                value={formatCurrency(summary.expense)}
+                change={summary.expenseChangePercent}
+                invertChange
+                caption={`${summary.transactionCount} ${summary.transactionCount === 1 ? 'transaction' : 'transactions'}`}
+              />
+              <StatCard
+                label="Savings rate"
+                value={formatPercent(summary.savingsRate)}
+                tone={Number(summary.savingsRate) < 0 ? 'error' : undefined}
+                caption={summary.savingsRate === null ? 'Add income to see this' : 'Of income kept'}
+              />
+            </StatStrip>
+          )}
 
-          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
-            <SectionCard title="Income vs expenses" subtitle="Last 6 months">
+          <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
+            <SectionCard title="Income and expenses" subtitle="Last 6 months">
               {loading ? (
                 <ChartSkeleton />
               ) : data.monthly.length === 0 ? (
@@ -151,19 +137,19 @@ export default function Dashboard() {
               )}
             </SectionCard>
 
-            <SectionCard title="Spending by category" subtitle="Selected month">
+            <SectionCard title="Where it went" subtitle={formatMonthLong(month)}>
               {loading ? (
                 <ChartSkeleton />
               ) : data.byCategory.length === 0 ? (
-                <EmptyState title="No spending this month" description="Categorised expenses will appear here." />
+                <EmptyState title="No spending this month" description="Expenses will be split by category here." />
               ) : (
                 <CategoryDonut data={data.byCategory} />
               )}
             </SectionCard>
           </Box>
 
-          <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
-            <SectionCard title="Daily spending" subtitle="Day by day through the month">
+          <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', lg: '3fr 2fr' } }}>
+            <SectionCard title="Daily spending" subtitle={formatMonthLong(month)}>
               {loading ? (
                 <ChartSkeleton height={240} />
               ) : data.daily.length === 0 ? (
@@ -173,20 +159,11 @@ export default function Dashboard() {
               )}
             </SectionCard>
 
-            <SectionCard
-              title="Budget progress"
-              subtitle="Selected month"
-              action={
-                <Button component={Link} to="/budgets" size="small">
-                  Manage
-                </Button>
-              }
-            >
+            <SectionCard title="Budgets" subtitle={formatMonthLong(month)} action={viewAll('/budgets')}>
               {loading ? (
                 <TableSkeleton rows={3} />
               ) : data.budgets.length === 0 ? (
                 <EmptyState
-                  icon={SavingsIcon}
                   title="No budgets set"
                   description="Set a monthly limit per category to see how much room is left."
                   action={
@@ -196,7 +173,7 @@ export default function Dashboard() {
                   }
                 />
               ) : (
-                <Stack spacing={2}>
+                <Stack spacing={2.5}>
                   {data.budgets.slice(0, 4).map((budget) => (
                     <BudgetBar key={budget.id} budget={budget} />
                   ))}
@@ -205,14 +182,7 @@ export default function Dashboard() {
             </SectionCard>
           </Box>
 
-          <SectionCard
-            title="Recent transactions"
-            action={
-              <Button component={Link} to="/transactions" size="small">
-                View all
-              </Button>
-            }
-          >
+          <SectionCard title="Latest transactions" action={viewAll('/transactions')} flush>
             {loading ? (
               <TableSkeleton rows={4} />
             ) : data.recent.length === 0 ? (
@@ -229,17 +199,15 @@ export default function Dashboard() {
             ) : (
               <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
                 {data.recent.map((transaction) => (
-                  <Stack key={transaction.id} direction="row" spacing={1.5} alignItems="center" sx={{ py: 1.25 }}>
+                  <Stack key={transaction.id} direction="row" spacing={2} sx={{ alignItems: 'center', py: 1.25, px: 2.5 }}>
+                    <Typography variant="caption" sx={{ ...mono, width: 52, flexShrink: 0 }}>
+                      {formatDate(transaction.spentOn)}
+                    </Typography>
                     <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                      <Typography variant="body2" fontWeight={600} noWrap>
+                      <Typography variant="body2" noWrap>
                         {transaction.description}
                       </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                        <CategoryChip transaction={transaction} />
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDate(transaction.spentOn)}
-                        </Typography>
-                      </Stack>
+                      <CategoryTag transaction={transaction} />
                     </Box>
                     <Amount transaction={transaction} />
                   </Stack>
@@ -250,44 +218,5 @@ export default function Dashboard() {
         </>
       )}
     </Stack>
-  )
-}
-
-/** Green under 70%, amber to 90%, red past that - and the same story in words. */
-export function BudgetBar({ budget, showName = true }) {
-  const used = Number(budget.usedPercent)
-  const tone = used >= 90 ? 'error' : used >= 70 ? 'warning' : 'success'
-  const remaining = Number(budget.remaining)
-
-  return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.5 }}>
-        {showName && (
-          <Typography variant="body2" fontWeight={600} noWrap>
-            {budget.categoryName}
-          </Typography>
-        )}
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ ml: 'auto' }}>
-          {formatCurrency(budget.spent)} / {formatCurrency(budget.monthlyLimit)}
-        </Typography>
-      </Stack>
-      <LinearProgress
-        variant="determinate"
-        value={Math.min(used, 100)}
-        color={tone}
-        aria-label={`${budget.categoryName} budget, ${used.toFixed(0)} percent used`}
-        sx={{ bgcolor: (theme) => alpha(theme.palette[tone].main, 0.14) }}
-      />
-      <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mt: 0.5 }}>
-        <Typography variant="caption" color={`${tone}.main`} fontWeight={600}>
-          {formatPercent(used, { fractionDigits: 0 })} used
-        </Typography>
-        <Typography variant="caption" color="text.secondary" noWrap>
-          {remaining >= 0
-            ? `${formatCurrency(remaining)} remaining`
-            : `${formatCurrency(Math.abs(remaining))} over budget`}
-        </Typography>
-      </Stack>
-    </Box>
   )
 }

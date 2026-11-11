@@ -1,51 +1,40 @@
-import BarChartIcon from '@mui/icons-material/BarChart'
-import DarkModeIcon from '@mui/icons-material/DarkMode'
-import DashboardIcon from '@mui/icons-material/SpaceDashboard'
-import LightModeIcon from '@mui/icons-material/LightMode'
-import LocalOfferIcon from '@mui/icons-material/LocalOffer'
+import DarkModeIcon from '@mui/icons-material/DarkModeOutlined'
+import LightModeIcon from '@mui/icons-material/LightModeOutlined'
 import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
-import SavingsIcon from '@mui/icons-material/Savings'
-import PersonOutlineIcon from '@mui/icons-material/PersonOutlineOutlined'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import WalletIcon from '@mui/icons-material/AccountBalanceWallet'
-import {
-  AppBar,
-  Avatar,
-  Box,
-  Divider,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import { alpha } from '@mui/material/styles'
+import { Avatar, Box, Button, ButtonBase, Drawer, IconButton, Stack, Typography } from '@mui/material'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext.jsx'
+import Wordmark from './Wordmark.jsx'
 
-const DRAWER_WIDTH = 252
+const DRAWER_WIDTH = 248
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: DashboardIcon },
-  { to: '/transactions', label: 'Transactions', icon: ReceiptLongIcon },
-  { to: '/budgets', label: 'Budgets', icon: SavingsIcon },
-  { to: '/analytics', label: 'Analytics', icon: BarChartIcon },
-  { to: '/categories', label: 'Categories', icon: LocalOfferIcon },
-  { to: '/import', label: 'Import CSV', icon: UploadFileIcon },
-  { to: '/profile', label: 'Profile', icon: PersonOutlineIcon },
+  {
+    heading: 'Ledger',
+    items: [
+      { to: '/', label: 'Dashboard' },
+      { to: '/transactions', label: 'Transactions' },
+    ],
+  },
+  {
+    heading: 'Plan',
+    items: [
+      { to: '/budgets', label: 'Budgets' },
+      { to: '/analytics', label: 'Analytics' },
+    ],
+  },
+  {
+    heading: 'Set up',
+    items: [
+      { to: '/categories', label: 'Categories' },
+      { to: '/import', label: 'Import CSV' },
+    ],
+  },
 ]
-
-const TITLES = Object.fromEntries(NAV.map((item) => [item.to, item.label]))
 
 export default function MainLayout({ mode, onToggleMode }) {
   const theme = useTheme()
@@ -53,27 +42,17 @@ export default function MainLayout({ mode, onToggleMode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { pathname } = useLocation()
 
-  const drawer = <SidebarContent pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+  const sidebar = (
+    <Sidebar pathname={pathname} mode={mode} onToggleMode={onToggleMode} onNavigate={() => setDrawerOpen(false)} />
+  )
+  const paper = { width: DRAWER_WIDTH, bgcolor: 'background.default', borderRight: 1, borderColor: 'divider' }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
+      <Box component="nav" aria-label="Main" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
         {isDesktop ? (
-          <Drawer
-            variant="permanent"
-            open
-            slotProps={{
-              paper: {
-                sx: {
-                  width: DRAWER_WIDTH,
-                  borderRight: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
-                },
-              },
-            }}
-          >
-            {drawer}
+          <Drawer variant="permanent" open slotProps={{ paper: { sx: paper } }}>
+            {sidebar}
           </Drawer>
         ) : (
           <Drawer
@@ -81,39 +60,39 @@ export default function MainLayout({ mode, onToggleMode }) {
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
             ModalProps={{ keepMounted: true }}
-            slotProps={{ paper: { sx: { width: DRAWER_WIDTH } } }}
+            slotProps={{ paper: { sx: paper } }}
           >
-            {drawer}
+            {sidebar}
           </Drawer>
         )}
       </Box>
 
       <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <AppBar
-          position="sticky"
-          color="inherit"
-          sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}
-        >
-          <Toolbar sx={{ gap: 1 }}>
-            {!isDesktop && (
-              <IconButton edge="start" onClick={() => setDrawerOpen(true)} aria-label="Open navigation menu">
-                <MenuIcon />
-              </IconButton>
-            )}
-            <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
-              {TITLES[pathname] || 'Expense Tracker'}
-            </Typography>
-            <Tooltip title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
-              <IconButton onClick={onToggleMode} aria-label="Toggle colour mode">
-                {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
-              </IconButton>
-            </Tooltip>
-          </Toolbar>
-        </AppBar>
+        {!isDesktop && (
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center',
+              position: 'sticky',
+              top: 0,
+              zIndex: 'appBar',
+              px: 1.5,
+              height: 56,
+              bgcolor: 'background.default',
+              borderBottom: 1,
+              borderColor: 'divider',
+            }}
+          >
+            <IconButton onClick={() => setDrawerOpen(true)} aria-label="Open navigation menu">
+              <MenuIcon />
+            </IconButton>
+            <Wordmark />
+          </Stack>
+        )}
 
         <Box
           component="main"
-          sx={{ p: { xs: 2, sm: 2.5, md: 3 }, flexGrow: 1, maxWidth: 1440, width: '100%', mx: 'auto' }}
+          sx={{ px: { xs: 2, sm: 3, md: 5 }, py: { xs: 3, md: 5 }, flexGrow: 1, maxWidth: 1240, width: '100%', mx: 'auto' }}
         >
           <Outlet />
         </Box>
@@ -122,87 +101,122 @@ export default function MainLayout({ mode, onToggleMode }) {
   )
 }
 
-function SidebarContent({ pathname, onNavigate }) {
+function Sidebar({ pathname, mode, onToggleMode, onNavigate }) {
   const { user, email, logout } = useAuth()
   const displayName = user?.username ? `@${user.username}` : email
 
   return (
     <Stack sx={{ height: '100%' }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 2.5, py: 2.5 }}>
-        <Box
-          aria-hidden
+      <Box sx={{ px: 3, pt: 3.5, pb: 3 }}>
+        <Wordmark />
+      </Box>
+
+      <Stack spacing={3} sx={{ px: 1.5, flexGrow: 1, overflowY: 'auto' }}>
+        {NAV.map(({ heading, items }) => (
+          <Box key={heading}>
+            <Typography variant="overline" component="p" color="text.secondary" sx={{ px: 1.5, mb: 0.5 }}>
+              {heading}
+            </Typography>
+            {items.map(({ to, label }) => (
+              <NavLink key={to} to={to} active={pathname === to} onClick={onNavigate}>
+                {label}
+              </NavLink>
+            ))}
+          </Box>
+        ))}
+      </Stack>
+
+      <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
+        <ButtonBase
+          component={Link}
+          to="/profile"
+          onClick={onNavigate}
+          aria-current={pathname === '/profile' ? 'page' : undefined}
           sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 2,
-            display: 'grid',
-            placeItems: 'center',
-            color: 'primary.contrastText',
-            bgcolor: 'primary.main',
+            width: '100%',
+            justifyContent: 'flex-start',
+            gap: 1.25,
+            p: 1,
+            borderRadius: 1,
+            textAlign: 'left',
+            '&:hover': { bgcolor: 'action.hover' },
           }}
         >
-          <WalletIcon fontSize="small" />
-        </Box>
-        <Typography variant="subtitle1" noWrap>
-          Expense Tracker
-        </Typography>
-      </Stack>
-      <Divider />
-
-      <List sx={{ px: 1.5, py: 2, flexGrow: 1 }}>
-        {NAV.map(({ to, label, icon: Icon }) => {
-          const active = pathname === to
-          return (
-            <ListItemButton
-              key={to}
-              component={Link}
-              to={to}
-              onClick={onNavigate}
-              selected={active}
-              aria-current={active ? 'page' : undefined}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                color: active ? 'primary.main' : 'text.secondary',
-                '&.Mui-selected': {
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1),
-                  '&:hover': {
-                    bgcolor: (theme) => alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.28 : 0.16),
-                  },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 38, color: 'inherit' }}>
-                <Icon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary={label} slotProps={{ primary: { fontWeight: active ? 600 : 500 } }} />
-            </ListItemButton>
-          )
-        })}
-      </List>
-
-      <Divider />
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 2 }}>
-        <Avatar
-          src={user?.avatarUrl || undefined}
-          sx={{ width: 34, height: 34, bgcolor: 'secondary.main', fontSize: 14 }}
-        >
-          {(user?.username || email || '?').slice(0, 1).toUpperCase()}
-        </Avatar>
-        <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-          <Typography variant="body2" noWrap title={email}>
-            {displayName}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-            {email}
-          </Typography>
-        </Box>
-        <Tooltip title="Log out">
-          <IconButton onClick={logout} aria-label="Log out" size="small">
-            <LogoutIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+          <Avatar
+            src={user?.avatarUrl || undefined}
+            variant="rounded"
+            sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main', color: 'primary.contrastText' }}
+          >
+            {(user?.username || email || '?').slice(0, 1).toUpperCase()}
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+              {displayName}
+            </Typography>
+            <Typography variant="caption" noWrap sx={{ display: 'block' }} title={email}>
+              {email}
+            </Typography>
+          </Box>
+        </ButtonBase>
+        <Stack direction="row" sx={{ mt: 0.5 }}>
+          <Button
+            size="small"
+            color="inherit"
+            onClick={onToggleMode}
+            startIcon={mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+            sx={{ color: 'text.secondary', flexGrow: 1, justifyContent: 'flex-start' }}
+          >
+            {mode === 'light' ? 'Dark mode' : 'Light mode'}
+          </Button>
+          <Button
+            size="small"
+            color="inherit"
+            onClick={logout}
+            startIcon={<LogoutIcon />}
+            sx={{ color: 'text.secondary' }}
+          >
+            Log out
+          </Button>
+        </Stack>
+      </Box>
     </Stack>
+  )
+}
+
+/** Plain text, with a bar in the margin marking the current page - the way a ledger tabs a section. */
+function NavLink({ to, active, onClick, children }) {
+  return (
+    <ButtonBase
+      component={Link}
+      to={to}
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      sx={{
+        position: 'relative',
+        width: '100%',
+        justifyContent: 'flex-start',
+        px: 1.5,
+        py: 0.875,
+        borderRadius: 1,
+        fontSize: '0.9375rem',
+        fontWeight: active ? 600 : 400,
+        color: active ? 'text.primary' : 'text.secondary',
+        '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+        '&::before': active
+          ? {
+              content: '""',
+              position: 'absolute',
+              left: -12,
+              top: 7,
+              bottom: 7,
+              width: 3,
+              borderRadius: '0 2px 2px 0',
+              bgcolor: 'primary.main',
+            }
+          : undefined,
+      }}
+    >
+      {children}
+    </ButtonBase>
   )
 }

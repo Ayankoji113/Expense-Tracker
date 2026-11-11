@@ -1,5 +1,5 @@
 import SearchIcon from '@mui/icons-material/Search'
-import { Box, Button, InputAdornment, MenuItem, Paper, TextField } from '@mui/material'
+import { Box, Button, InputAdornment, MenuItem, TextField } from '@mui/material'
 
 const EMPTY = { q: '', kind: '', categoryId: '', from: '', to: '' }
 
@@ -10,18 +10,16 @@ export default function TransactionFilters({ filters, categories, onChange }) {
   const dirty = Object.keys(EMPTY).some((key) => filters[key])
 
   return (
-    <Paper
-      variant="outlined"
+    <Box
+      role="search"
       sx={{
-        p: 2,
-        mb: 2,
-        borderRadius: 4,
         display: 'grid',
         gap: 1.5,
+        alignItems: 'center',
         gridTemplateColumns: {
           xs: '1fr',
           sm: 'repeat(2, 1fr)',
-          md: 'minmax(180px, 1.4fr) repeat(3, 1fr) auto',
+          lg: 'minmax(200px, 1.5fr) 1fr 1fr 1.6fr auto',
         },
       }}
     >
@@ -67,7 +65,7 @@ export default function TransactionFilters({ filters, categories, onChange }) {
           type="date"
           value={filters.from}
           onChange={(e) => set({ from: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
+          slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: filters.to || undefined } }}
         />
         <TextField
           size="small"
@@ -75,12 +73,12 @@ export default function TransactionFilters({ filters, categories, onChange }) {
           type="date"
           value={filters.to}
           onChange={(e) => set({ to: e.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
+          slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: filters.from || undefined } }}
         />
       </Box>
       <Button onClick={() => onChange({ ...EMPTY })} disabled={!dirty} sx={{ justifySelf: 'start' }}>
         Clear
       </Button>
-    </Paper>
+    </Box>
   )
 }

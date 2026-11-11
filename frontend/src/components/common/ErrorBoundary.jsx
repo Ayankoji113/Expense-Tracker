@@ -20,7 +20,7 @@ export default class ErrorBoundary extends Component {
     if (!this.state.failed) return this.props.children
     return (
       <Container maxWidth="sm" sx={{ py: 10 }}>
-        <Stack spacing={2} alignItems="flex-start">
+        <Stack spacing={2} sx={{ alignItems: 'flex-start' }}>
           <Typography variant="h5">Something went wrong</Typography>
           <Typography variant="body2" color="text.secondary">
             The page failed to load. Reloading usually fixes it - your data is safe.

@@ -30,6 +30,14 @@ class CsvParsingTest {
         assertThat(CsvImportService.parseAmount("$1,234.56")).isEqualByComparingTo("1234.56");
         assertThat(CsvImportService.parseAmount("(1,234.56)")).isEqualByComparingTo("1234.56");
         assertThat(CsvImportService.parseAmount("-42.00")).isEqualByComparingTo("42.00");
+        assertThat(CsvImportService.parseAmount("₹1,25,000.00")).isEqualByComparingTo("125000.00");
+        assertThat(CsvImportService.parseAmount("Rs. 450")).isEqualByComparingTo("450.00");
+        assertThat(CsvImportService.parseAmount("INR 99.9")).isEqualByComparingTo("99.90");
+    }
+
+    @Test
+    void rejectsAmountsTheColumnCannotHold() {
+        assertThatThrownBy(() -> CsvImportService.parseAmount("99999999999.00")).hasMessageContaining("too large");
     }
 
     @Test

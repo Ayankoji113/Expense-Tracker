@@ -3,6 +3,7 @@ package com.expensetracker.expense;
 import com.expensetracker.category.Category;
 import com.expensetracker.category.CategoryRepository;
 import com.expensetracker.common.BadRequestException;
+import com.expensetracker.common.Dates;
 import com.expensetracker.common.NotFoundException;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,14 +32,15 @@ public class ExpenseService {
     public Page<ExpenseDto> search(Long userId, LocalDate from, LocalDate to, Expense.Kind kind, Long categoryId,
             String q, Pageable pageable) {
         var kinds = kind == null ? java.util.List.of(Expense.Kind.values()) : java.util.List.of(kind);
-        Page<Expense> page = expenses.search(userId, from == null ? EPOCH : from, to == null ? LocalDate.now() : to,
-                kinds, categoryId, likePattern(q), pageable);
+        Page<Expense> page = expenses.search(userId, from == null ? EPOCH : from,
+                to == null ? Dates.latestToday() : to, kinds, categoryId, likePattern(q), pageable);
         Map<Long, Category> byId = categoriesById(userId);
         return page.map(e -> toDto(e, byId));
     }
 
     @Transactional
     public ExpenseDto create(Long userId, ExpenseRequest req) {
+        requireNotInFuture(req.spentOn());
         Long categoryId = resolveCategory(userId, req.categoryId());
         Expense saved = expenses.save(new Expense(userId, categoryId, req.amount(), req.spentOn(),
                 req.description().trim(), Expense.Source.MANUAL, req.kindOrDefault()));
@@ -47,6 +49,7 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseDto update(Long userId, Long id, ExpenseRequest req) {
+        requireNotInFuture(req.spentOn());
         Expense expense = expenses.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new NotFoundException("Expense not found"));
         expense.update(resolveCategory(userId, req.categoryId()), req.amount(), req.spentOn(),
@@ -85,7 +88,7 @@ public class ExpenseService {
     static ExpenseDto toDto(Expense e, Map<Long, Category> categoriesById) {
         Category c = e.getCategoryId() == null ? null : categoriesById.get(e.getCategoryId());
         return new ExpenseDto(e.getId(), e.getAmount(), e.getSpentOn(), e.getDescription(), e.getCategoryId(),
-                c == null ? "Uncategorized" : c.getName(), c == null ? "#64748B" : c.getColor(),
+                c == null ? "Uncategorized" : c.getName(), c == null ? "#8A857A" : c.getColor(),
                 e.getSource().name(), e.getKind().name());
     }
 
@@ -93,7 +96,17 @@ public class ExpenseService {
         return list.stream().map(e -> toDto(e, categoriesById)).toList();
     }
 
+    private static void requireNotInFuture(LocalDate spentOn) {
+        if (spentOn.isAfter(Dates.latestToday())) {
+            throw new BadRequestException("spentOn cannot be in the future");
+        }
+    }
+
+    /** A typed % or _ is text to find, not a wildcard - the query declares ! as its escape character. */
     private static String likePattern(String q) {
-        return q == null || q.isBlank() ? "%" : "%" + q.trim() + "%";
+        if (q == null || q.isBlank()) {
+            return "%";
+        }
+        return "%" + q.trim().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 }

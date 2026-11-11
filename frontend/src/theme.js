@@ -1,55 +1,72 @@
 import { createTheme } from '@mui/material/styles'
 
 /**
- * One place for every colour in the app. Semantic roles, used consistently:
- * blue = actions/navigation, green = income, red = expense, amber = budget warning,
- * purple = analytics accents.
+ * The app is styled as a ledger: warm paper, ink, hairline rules, and one green. Three typefaces
+ * with fixed jobs - a serif for headings, a sans for reading, and a monospace for every figure so
+ * columns of money line up.
  */
-const brand = {
-  primary: '#2563EB',
-  secondary: '#7C3AED',
-  success: '#16A34A',
-  error: '#DC2626',
-  warning: '#D97706',
-  info: '#0284C7',
+export const fonts = {
+  display: '"Fraunces", "Iowan Old Style", Georgia, serif',
+  body: '"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
+  mono: '"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace',
 }
 
+/** Spread into sx wherever a number is shown. */
+export const mono = { fontFamily: fonts.mono, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }
+
+// Semantic roles, used consistently: green = income and actions, terracotta = money out or over,
+// ochre = getting close to a limit.
 const light = {
   mode: 'light',
-  ...Object.fromEntries(Object.entries(brand).map(([key, main]) => [key, { main }])),
-  background: { default: '#F8FAFC', paper: '#FFFFFF' },
-  text: { primary: '#0F172A', secondary: '#64748B' },
-  divider: '#E2E8F0',
+  primary: { main: '#1F4D3A', contrastText: '#F7F4EC' },
+  secondary: { main: '#8A5A1F' },
+  success: { main: '#1F6B4A' },
+  error: { main: '#B4412B' },
+  warning: { main: '#A66A12' },
+  info: { main: '#2F5D8A' },
+  background: { default: '#F3F0E8', paper: '#FBF9F4' },
+  text: { primary: '#1C1B18', secondary: '#6A665C' },
+  divider: '#D9D4C7',
 }
 
-// Dark mode is its own palette, not an inversion: lifted surfaces, softened accents.
+// Dark mode is its own palette, not an inversion: the same ledger read by lamplight.
 const dark = {
   mode: 'dark',
-  primary: { main: '#60A5FA' },
-  secondary: { main: '#A78BFA' },
-  success: { main: '#4ADE80' },
-  error: { main: '#F87171' },
-  warning: { main: '#FBBF24' },
-  info: { main: '#38BDF8' },
-  background: { default: '#0B1120', paper: '#111827' },
-  text: { primary: '#F1F5F9', secondary: '#94A3B8' },
-  divider: '#1E293B',
+  primary: { main: '#9BD0B1', contrastText: '#10231A' },
+  secondary: { main: '#D9B26A' },
+  success: { main: '#8CCBA6' },
+  error: { main: '#E8917B' },
+  warning: { main: '#E2B866' },
+  info: { main: '#8DB6DB' },
+  background: { default: '#111310', paper: '#181B17' },
+  text: { primary: '#ECE8DC', secondary: '#9C988B' },
+  divider: '#2B2F29',
 }
 
 export function createAppTheme(mode) {
   const palette = mode === 'dark' ? dark : light
+  const label = {
+    fontFamily: fonts.body,
+    fontSize: '0.6875rem',
+    fontWeight: 600,
+    letterSpacing: '0.09em',
+    textTransform: 'uppercase',
+    lineHeight: 1.6,
+  }
 
   return createTheme({
     palette,
-    shape: { borderRadius: 12 },
+    shape: { borderRadius: 6 },
     typography: {
-      fontFamily: '"Inter", "Roboto", system-ui, -apple-system, sans-serif',
-      h4: { fontWeight: 700, letterSpacing: '-0.02em' },
-      h5: { fontWeight: 700, letterSpacing: '-0.01em' },
-      h6: { fontWeight: 600 },
-      subtitle1: { fontWeight: 600 },
+      fontFamily: fonts.body,
+      h3: { fontFamily: fonts.display, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.1 },
+      h4: { fontFamily: fonts.display, fontWeight: 500, letterSpacing: '-0.02em', lineHeight: 1.15 },
+      h5: { fontFamily: fonts.display, fontWeight: 500, letterSpacing: '-0.015em' },
+      h6: { fontWeight: 600, fontSize: '1.0625rem' },
+      subtitle1: { fontWeight: 600, fontSize: '0.9375rem', lineHeight: 1.4 },
       subtitle2: { fontWeight: 600 },
-      button: { fontWeight: 600, textTransform: 'none' },
+      overline: label,
+      button: { fontWeight: 500, textTransform: 'none' },
       caption: { color: palette.text.secondary },
     },
     components: {
@@ -57,6 +74,9 @@ export function createAppTheme(mode) {
         styleOverrides: {
           // charts and tables scroll inside their own containers instead of the page
           body: { overflowX: 'hidden' },
+          // keyboard users must always see where they are
+          ':focus-visible': { outline: `2px solid ${palette.primary.main}`, outlineOffset: 2 },
+          '::selection': { backgroundColor: palette.primary.main, color: palette.primary.contrastText },
           '@media (prefers-reduced-motion: reduce)': {
             '*': { animationDuration: '0.01ms !important', transitionDuration: '0.01ms !important' },
           },
@@ -69,30 +89,43 @@ export function createAppTheme(mode) {
           outlined: { borderColor: palette.divider },
         },
       },
-      MuiCard: {
-        defaultProps: { variant: 'outlined' },
-        styleOverrides: {
-          root: {
-            borderRadius: 16,
-            borderColor: palette.divider,
-            transition: 'box-shadow 160ms ease, transform 160ms ease',
-          },
-        },
-      },
       MuiButton: {
         defaultProps: { disableElevation: true },
-        styleOverrides: { root: { borderRadius: 10, paddingInline: 16 } },
+        styleOverrides: {
+          root: { paddingInline: 16 },
+          sizeLarge: { paddingBlock: 10 },
+          outlined: { borderColor: palette.divider, color: palette.text.primary },
+        },
       },
-      MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 10 } } },
-      MuiChip: { styleOverrides: { root: { fontWeight: 600 } } },
-      MuiLinearProgress: { styleOverrides: { root: { borderRadius: 999, height: 8 } } },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: { backgroundColor: palette.background.paper },
+          notchedOutline: { borderColor: palette.divider },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: { paper: { border: `1px solid ${palette.divider}` } },
+      },
+      MuiDialogTitle: {
+        styleOverrides: { root: { fontFamily: fonts.display, fontWeight: 500, fontSize: '1.375rem' } },
+      },
+      MuiChip: { styleOverrides: { root: { borderRadius: 4, fontWeight: 500 } } },
+      MuiLinearProgress: { styleOverrides: { root: { borderRadius: 2, height: 6 } } },
       MuiTableCell: {
         styleOverrides: {
           root: { borderColor: palette.divider },
-          head: { fontWeight: 600, color: palette.text.secondary, whiteSpace: 'nowrap' },
+          head: { ...label, color: palette.text.secondary, whiteSpace: 'nowrap' },
         },
       },
-      MuiTooltip: { defaultProps: { arrow: true } },
+      MuiTooltip: {
+        defaultProps: { arrow: true },
+        styleOverrides: {
+          tooltip: { backgroundColor: palette.text.primary, color: palette.background.default, fontWeight: 500 },
+          arrow: { color: palette.text.primary },
+        },
+      },
+      MuiSkeleton: { styleOverrides: { rounded: { borderRadius: 4 } } },
+      MuiLink: { defaultProps: { underline: 'always' }, styleOverrides: { root: { textUnderlineOffset: 3 } } },
     },
   })
 }

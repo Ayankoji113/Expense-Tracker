@@ -64,6 +64,10 @@ public class BudgetService {
         Budget budget = budgets.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new NotFoundException("Budget not found"));
         requireVisibleCategory(userId, request.categoryId());
+        if (!budget.getCategoryId().equals(request.categoryId())
+                && budgets.existsByUserIdAndCategoryId(userId, request.categoryId())) {
+            throw new BadRequestException("That category already has a budget");
+        }
         budget.update(request.categoryId(), request.monthlyLimit());
         budgets.save(budget);
         return list(userId, YearMonth.now()).stream()
@@ -96,7 +100,7 @@ public class BudgetService {
                         .divide(budget.getMonthlyLimit(), 1, RoundingMode.HALF_UP);
         return new BudgetDto(budget.getId(), budget.getCategoryId(),
                 category == null ? "Unknown" : category.getName(),
-                category == null ? "#64748B" : category.getColor(),
+                category == null ? "#8A857A" : category.getColor(),
                 budget.getMonthlyLimit(), spent, budget.getMonthlyLimit().subtract(spent), used);
     }
 }

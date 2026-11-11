@@ -1,24 +1,29 @@
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import InsightsIcon from '@mui/icons-material/Insights'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import WalletIcon from '@mui/icons-material/AccountBalanceWallet'
-import { Box, Paper, Stack, Typography } from '@mui/material'
-import { alpha } from '@mui/material/styles'
+import { Box, Stack, Typography } from '@mui/material'
+import { mono } from '../../theme'
+import Wordmark from './Wordmark.jsx'
 
-const HIGHLIGHTS = [
-  { icon: UploadFileIcon, title: 'Import your bank CSV', body: 'Bad rows are reported, duplicates skipped.' },
-  { icon: AutoAwesomeIcon, title: 'Auto-categorization', body: 'Keyword rules file each transaction for you.' },
-  { icon: InsightsIcon, title: 'See where it goes', body: 'Budgets, trends and category breakdowns.' },
+// the sign-in panel keeps its own colours in both modes, like a cover
+const PANEL = { bg: '#163A2C', ink: '#EFEBDD', dim: 'rgba(239, 235, 221, 0.62)', rule: 'rgba(239, 235, 221, 0.18)' }
+
+// what the product makes, shown instead of described
+const LEDGER = [
+  ['01', 'Salary, August', '+85,000'],
+  ['01', 'Big Bazaar groceries', '−3,240'],
+  ['02', 'Uber trip', '−320'],
+  ['05', 'Rent', '−25,000'],
+  ['07', 'Netflix', '−649'],
+  ['09', 'Indian Oil fuel', '−2,200'],
+  ['15', 'Electricity bill', '−2,180'],
 ]
 
-/** Brand panel on desktop, just the form on mobile. */
+/** Cover panel on desktop, just the form on mobile. */
 export default function AuthLayout({ title, subtitle, children }) {
   return (
     <Box
       sx={{
         minHeight: '100vh',
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '5fr 4fr' },
+        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '11fr 9fr' },
         bgcolor: 'background.default',
       }}
     >
@@ -26,95 +31,77 @@ export default function AuthLayout({ title, subtitle, children }) {
         sx={{
           display: { xs: 'none', md: 'flex' },
           flexDirection: 'column',
-          justifyContent: 'center',
-          gap: 4,
-          p: 6,
-          color: 'common.white',
-          background: (theme) =>
-            `linear-gradient(140deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+          justifyContent: 'space-between',
+          gap: 6,
+          p: { md: 5, lg: 7 },
+          bgcolor: PANEL.bg,
+          color: PANEL.ink,
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
-              display: 'grid',
-              placeItems: 'center',
-              bgcolor: alpha('#FFFFFF', 0.2),
-            }}
-          >
-            <WalletIcon />
-          </Box>
-          <Typography variant="h6">Expense Tracker</Typography>
-        </Stack>
+        <Wordmark inverted />
 
         <Box>
-          <Typography variant="h4" sx={{ maxWidth: 420 }}>
-            Know exactly where your money goes.
+          <Typography variant="h3" component="p" sx={{ maxWidth: 440, fontSize: { md: '2.5rem', lg: '3rem' } }}>
+            Every rupee,{' '}
+            <Box component="em" sx={{ fontStyle: 'italic' }}>
+              written down.
+            </Box>
           </Typography>
-          <Typography sx={{ mt: 1.5, maxWidth: 420, opacity: 0.85 }}>
-            Import statements, set budgets, and watch the trends - all in one place.
+          <Typography sx={{ mt: 2, maxWidth: 420, color: PANEL.dim }}>
+            Import a bank statement, let your own rules file each line, and see what the month actually cost.
           </Typography>
         </Box>
 
-        <Stack spacing={2}>
-          {HIGHLIGHTS.map(({ icon: Icon, title: heading, body }) => (
-            <Stack key={heading} direction="row" spacing={2} alignItems="flex-start">
-              <Box
-                aria-hidden
-                sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 2,
-                  display: 'grid',
-                  placeItems: 'center',
-                  bgcolor: alpha('#FFFFFF', 0.18),
-                  flexShrink: 0,
-                }}
-              >
-                <Icon fontSize="small" />
+        <Box aria-hidden sx={{ maxWidth: 460 }}>
+          <Stack
+            direction="row"
+            sx={{ justifyContent: 'space-between', pb: 1, borderBottom: `1px solid ${PANEL.rule}`, color: PANEL.dim }}
+          >
+            <Typography variant="overline">August 2026</Typography>
+            <Typography variant="overline">₹</Typography>
+          </Stack>
+          {LEDGER.map(([day, description, amount]) => (
+            <Stack
+              key={description}
+              direction="row"
+              spacing={2}
+              sx={{ py: 0.875, borderBottom: `1px solid ${PANEL.rule}`, fontSize: '0.8125rem' }}
+            >
+              <Box component="span" sx={{ ...mono, color: PANEL.dim }}>
+                {day}
               </Box>
-              <Box>
-                <Typography variant="subtitle2">{heading}</Typography>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  {body}
-                </Typography>
+              <Box component="span" sx={{ flexGrow: 1 }}>
+                {description}
+              </Box>
+              <Box component="span" sx={mono}>
+                {amount}
               </Box>
             </Stack>
           ))}
-        </Stack>
+          <Stack direction="row" sx={{ justifyContent: 'space-between', pt: 1.25, fontSize: '0.8125rem' }}>
+            <Box component="span" sx={{ color: PANEL.dim }}>
+              Kept 60.5% of income
+            </Box>
+            <Box component="span" sx={{ ...mono, fontWeight: 600 }}>
+              +51,411
+            </Box>
+          </Stack>
+        </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', placeItems: 'center', p: { xs: 2, sm: 4 } }}>
-        <Paper
-          variant="outlined"
-          sx={{ p: { xs: 3, sm: 4 }, borderRadius: 4, width: '100%', maxWidth: 420 }}
-        >
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3, display: { md: 'none' } }}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: 2,
-                display: 'grid',
-                placeItems: 'center',
-                color: 'primary.contrastText',
-                bgcolor: 'primary.main',
-              }}
-            >
-              <WalletIcon fontSize="small" />
-            </Box>
-            <Typography variant="subtitle1">Expense Tracker</Typography>
-          </Stack>
-
-          <Typography variant="h5">{title}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 3 }}>
+      <Box sx={{ display: 'grid', placeItems: 'center', p: { xs: 3, sm: 5 } }}>
+        <Box sx={{ width: '100%', maxWidth: 380 }}>
+          <Box sx={{ display: { md: 'none' }, mb: 5 }}>
+            <Wordmark />
+          </Box>
+          <Typography variant="h4" component="h1">
+            {title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 4 }}>
             {subtitle}
           </Typography>
           {children}
-        </Paper>
+        </Box>
       </Box>
     </Box>
   )

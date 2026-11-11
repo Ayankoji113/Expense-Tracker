@@ -1,22 +1,9 @@
-import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead'
-import {
-  Alert,
-  Box,
-  Button,
-  Link as MuiLink,
-  Stack,
-  Step,
-  StepLabel,
-  Stepper,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, Button, Link as MuiLink, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import client, { errorMessage } from '../api/client'
 import AuthLayout from '../components/layout/AuthLayout.jsx'
-
-const STEPS = ['Your email', 'Code and new password']
+import { mono } from '../theme'
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
@@ -52,6 +39,7 @@ export default function ForgotPassword() {
     const errors = {}
     if (!/^[0-9]{6}$/.test(form.code.trim())) errors.code = 'Enter the 6-digit code'
     if (form.password.length < 8) errors.password = 'At least 8 characters'
+    else if (form.password.length > 72) errors.password = 'At most 72 characters'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
@@ -71,19 +59,26 @@ export default function ForgotPassword() {
     }
   }
 
+  const startOver = () => {
+    setStep(0)
+    setError('')
+    setFieldErrors({})
+    setForm({ ...form, code: '', password: '' })
+  }
+
   return (
     <AuthLayout
       title="Reset your password"
-      subtitle="We will email you a 6-digit code, then you can choose a new password."
+      subtitle={
+        step === 0
+          ? 'We will email you a 6-digit code, then you can choose a new password.'
+          : `Enter the code sent to ${form.email.trim()} and choose a new password.`
+      }
     >
       <Stack spacing={3}>
-        <Stepper activeStep={step} alternativeLabel>
-          {STEPS.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        <Typography variant="overline" color="text.secondary" aria-live="polite">
+          Step {step + 1} of 2
+        </Typography>
 
         {error && <Alert severity="error">{error}</Alert>}
 
@@ -106,10 +101,10 @@ export default function ForgotPassword() {
         ) : (
           <Stack component="form" spacing={2.5} onSubmit={resetPassword} noValidate>
             {notice && (
-              <Alert severity={notice.severity} icon={<MarkEmailReadIcon fontSize="inherit" />}>
+              <Alert severity={notice.severity}>
                 {notice.message}
                 {notice.hint && (
-                  <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                  <Typography variant="caption" color="inherit" sx={{ display: 'block', mt: 0.5 }}>
                     {notice.hint}
                   </Typography>
                 )}
@@ -119,11 +114,14 @@ export default function ForgotPassword() {
               label="6-digit code"
               required
               autoFocus
+              autoComplete="one-time-code"
               value={form.code}
               onChange={(event) => setForm({ ...form, code: event.target.value.replace(/\D/g, '').slice(0, 6) })}
               error={Boolean(fieldErrors.code)}
               helperText={fieldErrors.code || 'Expires 15 minutes after it was sent'}
-              slotProps={{ htmlInput: { inputMode: 'numeric', maxLength: 6, style: { letterSpacing: '0.4em' } } }}
+              slotProps={{
+                htmlInput: { inputMode: 'numeric', maxLength: 6, style: { ...mono, letterSpacing: '0.4em' } },
+              }}
             />
             <TextField
               label="New password"
@@ -138,17 +136,17 @@ export default function ForgotPassword() {
             <Button type="submit" variant="contained" size="large" disabled={busy}>
               {busy ? 'Saving...' : 'Set new password'}
             </Button>
-            <Button onClick={() => setStep(0)} disabled={busy}>
+            <Button onClick={startOver} disabled={busy} color="inherit">
               Use a different email
             </Button>
           </Stack>
         )}
 
-        <Box sx={{ textAlign: 'center' }}>
-          <MuiLink component={Link} to="/login" underline="hover">
+        <Typography variant="body2">
+          <MuiLink component={Link} to="/login">
             Back to sign in
           </MuiLink>
-        </Box>
+        </Typography>
       </Stack>
     </AuthLayout>
   )

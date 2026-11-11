@@ -1,22 +1,15 @@
 import AddIcon from '@mui/icons-material/Add'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined'
-import {
-  Box,
-  Button,
-  Chip,
-  IconButton,
-  MenuItem,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Box, Button, IconButton, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import client, { errorMessage } from '../api/client'
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
 import { useFeedback } from '../components/common/Feedback.jsx'
-import { EmptyState, ErrorState, SectionCard, TableSkeleton } from '../components/common/States.jsx'
+import { EmptyState, ErrorState, PageHeader, SectionCard, TableSkeleton } from '../components/common/States.jsx'
+import { mono } from '../theme'
+
+const DEFAULT_COLOR = '#3D6B8E'
+const rule = <Box sx={{ borderBottom: 1, borderColor: 'divider' }} />
 
 export default function Categories() {
   const { notify } = useFeedback()
@@ -24,7 +17,7 @@ export default function Categories() {
   const [rules, setRules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [newCategory, setNewCategory] = useState({ name: '', color: '#2563EB' })
+  const [newCategory, setNewCategory] = useState({ name: '', color: DEFAULT_COLOR })
   const [newRule, setNewRule] = useState({ keyword: '', categoryId: '' })
   const [busy, setBusy] = useState(false)
   const [deleting, setDeleting] = useState(null)
@@ -65,33 +58,32 @@ export default function Categories() {
 
   if (error && !loading) {
     return (
-      <Paper variant="outlined" sx={{ borderRadius: 4 }}>
+      <Paper variant="outlined">
         <ErrorState message={error} onRetry={load} />
       </Paper>
     )
   }
 
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5">Categories and rules</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Categories group your spending. Rules tell the CSV importer where each transaction belongs.
-        </Typography>
-      </Box>
+    <Stack spacing={3}>
+      <PageHeader
+        eyebrow="Set up"
+        title="Categories and rules"
+        description="Categories group your spending. Rules tell the CSV importer where each line belongs."
+      />
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' } }}>
-        <SectionCard title="Categories" subtitle="Built-in categories are shared by everyone">
+      <Box sx={{ display: 'grid', gap: 3, alignItems: 'start', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' } }}>
+        <SectionCard title="Categories" subtitle="Built-in ones are shared by everyone" flush>
           <Stack
             component="form"
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
-            sx={{ mb: 2 }}
+            sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider' }}
             onSubmit={(event) => {
               event.preventDefault()
               run(async () => {
-                await client.post('/categories', newCategory)
-                setNewCategory({ name: '', color: '#2563EB' })
+                await client.post('/categories', { ...newCategory, name: newCategory.name.trim() })
+                setNewCategory({ name: '', color: DEFAULT_COLOR })
               }, 'Category created')
             }}
           >
@@ -102,6 +94,7 @@ export default function Categories() {
               fullWidth
               value={newCategory.name}
               onChange={(event) => setNewCategory({ ...newCategory, name: event.target.value })}
+              slotProps={{ htmlInput: { maxLength: 60 } }}
             />
             <TextField
               size="small"
@@ -109,10 +102,10 @@ export default function Categories() {
               label="Colour"
               value={newCategory.color}
               onChange={(event) => setNewCategory({ ...newCategory, color: event.target.value })}
-              sx={{ width: { xs: '100%', sm: 92 } }}
+              sx={{ width: { xs: '100%', sm: 92 }, flexShrink: 0 }}
               slotProps={{ inputLabel: { shrink: true } }}
             />
-            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy}>
+            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy} sx={{ flexShrink: 0 }}>
               Add
             </Button>
           </Stack>
@@ -120,18 +113,25 @@ export default function Categories() {
           {loading ? (
             <TableSkeleton rows={4} />
           ) : (
-            <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
+            <Stack divider={rule}>
               {categories.map((category) => (
-                <Stack key={category.id} direction="row" alignItems="center" spacing={1.5} sx={{ py: 1 }}>
+                <Stack
+                  key={category.id}
+                  direction="row"
+                  spacing={1.5}
+                  sx={{ alignItems: 'center', px: 2.5, minHeight: 44 }}
+                >
                   <Box
-                    sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: category.color, flexShrink: 0 }}
+                    sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: category.color, flexShrink: 0 }}
                     aria-hidden
                   />
                   <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
                     {category.name}
                   </Typography>
                   {category.builtIn ? (
-                    <Chip size="small" label="built-in" variant="outlined" />
+                    <Typography variant="overline" color="text.secondary">
+                      Built-in
+                    </Typography>
                   ) : (
                     <IconButton
                       size="small"
@@ -147,16 +147,16 @@ export default function Categories() {
           )}
         </SectionCard>
 
-        <SectionCard title="Auto-categorization rules" subtitle="On import, the longest matching keyword wins">
+        <SectionCard title="Import rules" subtitle="The longest matching keyword wins" flush>
           <Stack
             component="form"
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
-            sx={{ mb: 2 }}
+            sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider' }}
             onSubmit={(event) => {
               event.preventDefault()
               run(async () => {
-                await client.post('/categories/rules', newRule)
+                await client.post('/categories/rules', { ...newRule, keyword: newRule.keyword.trim() })
                 setNewRule({ keyword: '', categoryId: '' })
               }, 'Rule created')
             }}
@@ -169,6 +169,7 @@ export default function Categories() {
               placeholder="e.g. swiggy"
               value={newRule.keyword}
               onChange={(event) => setNewRule({ ...newRule, keyword: event.target.value })}
+              slotProps={{ htmlInput: { maxLength: 60 } }}
             />
             <TextField
               size="small"
@@ -177,7 +178,7 @@ export default function Categories() {
               label="Category"
               value={newRule.categoryId}
               onChange={(event) => setNewRule({ ...newRule, categoryId: event.target.value })}
-              sx={{ minWidth: { sm: 150 } }}
+              sx={{ minWidth: { sm: 160 }, flexShrink: 0 }}
             >
               {categories.map((category) => (
                 <MenuItem key={category.id} value={category.id}>
@@ -185,7 +186,7 @@ export default function Categories() {
                 </MenuItem>
               ))}
             </TextField>
-            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy}>
+            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={busy} sx={{ flexShrink: 0 }}>
               Add
             </Button>
           </Stack>
@@ -194,26 +195,23 @@ export default function Categories() {
             <TableSkeleton rows={4} />
           ) : rules.length === 0 ? (
             <EmptyState
-              icon={AutoAwesomeIcon}
               title="No rules yet"
-              description="Without rules, imported rows land in Uncategorized."
+              description="Without rules, imported rows land in Uncategorized. Try “swiggy” → Dining."
             />
           ) : (
-            <Stack divider={<Box sx={{ borderBottom: 1, borderColor: 'divider' }} />}>
-              {rules.map((rule) => (
-                <Stack key={rule.id} direction="row" alignItems="center" spacing={1.5} sx={{ py: 1 }}>
-                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                    <Typography variant="body2" noWrap>
-                      {rule.keyword}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      → {rule.categoryName}
-                    </Typography>
-                  </Box>
+            <Stack divider={rule}>
+              {rules.map((item) => (
+                <Stack key={item.id} direction="row" spacing={1.5} sx={{ alignItems: 'center', px: 2.5, minHeight: 44 }}>
+                  <Typography variant="body2" noWrap sx={{ ...mono, minWidth: 0 }}>
+                    {item.keyword}
+                  </Typography>
+                  <Typography variant="caption" noWrap sx={{ flexGrow: 1 }}>
+                    → {item.categoryName}
+                  </Typography>
                   <IconButton
                     size="small"
-                    aria-label={`Delete rule ${rule.keyword}`}
-                    onClick={() => setDeleting({ kind: 'rule', item: rule })}
+                    aria-label={`Delete rule ${item.keyword}`}
+                    onClick={() => setDeleting({ kind: 'rule', item })}
                   >
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
@@ -229,7 +227,7 @@ export default function Categories() {
         title={deleting?.kind === 'category' ? 'Delete this category?' : 'Delete this rule?'}
         description={
           deleting?.kind === 'category'
-            ? `"${deleting?.item.name}" will be removed and its transactions become Uncategorized.`
+            ? `"${deleting?.item.name}" will be removed along with its budget and import rules. Its transactions become Uncategorized.`
             : `Imports will stop matching "${deleting?.item.keyword}".`
         }
         onConfirm={confirmDelete}

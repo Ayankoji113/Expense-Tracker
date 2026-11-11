@@ -8,6 +8,9 @@ services:
     dockerContext: ./backend
     healthCheckPath: /actuator/health
     envVars:
+      # without a profile Spring runs as "default", which ProductionConfigCheck treats as development
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
       - key: JWT_SECRET
         generateValue: true
       # Render can only hand out a postgresql:// string, while the JDBC driver wants jdbc:postgresql://

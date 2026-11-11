@@ -1,13 +1,10 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlineOutlined'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
+import UploadFileIcon from '@mui/icons-material/UploadFileOutlined'
 import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   LinearProgress,
+  Link as MuiLink,
   Paper,
   Stack,
   Table,
@@ -23,7 +20,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import client, { errorMessage } from '../api/client'
 import { useFeedback } from '../components/common/Feedback.jsx'
-import { SectionCard } from '../components/common/States.jsx'
+import { PageHeader, SectionCard } from '../components/common/States.jsx'
+import StatCard, { StatStrip } from '../components/dashboard/StatCard.jsx'
+import { mono } from '../theme'
 
 const SAMPLE = `Date,Description,Amount
 2026-08-01,BIG BAZAAR GROCERIES,2450
@@ -39,7 +38,8 @@ export default function Import() {
   const [dragging, setDragging] = useState(false)
 
   const upload = async (selected) => {
-    if (!selected) return
+    if (!selected || busy) return
+    setFile(selected)
     setBusy(true)
     setError('')
     setSummary(null)
@@ -50,30 +50,27 @@ export default function Import() {
       setSummary(data)
       notify(`${data.imported} ${data.imported === 1 ? 'transaction' : 'transactions'} imported`)
     } catch (e) {
-      setError(errorMessage(e, 'Import failed'))
+      setError(
+        e.response?.status === 413
+          ? 'That file is larger than 5 MB. Split it and import the parts.'
+          : errorMessage(e, 'Import failed'),
+      )
     } finally {
       setBusy(false)
     }
   }
 
-  const pick = (selected) => {
-    setFile(selected)
-    upload(selected)
-  }
-
   return (
-    <Stack spacing={2}>
-      <Box>
-        <Typography variant="h5">Import a bank CSV</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Rows are categorised from your keyword rules, duplicates are skipped, and any bad row is reported
-          without stopping the import.
-        </Typography>
-      </Box>
+    <Stack spacing={3}>
+      <PageHeader
+        eyebrow="Set up"
+        title="Import a bank CSV"
+        description="Rows are categorised from your keyword rules, duplicates are skipped, and a bad row is reported without stopping the rest."
+      />
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' } }}>
+      <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: '3fr 2fr' } }}>
         <Paper
           variant="outlined"
           onDragOver={(event) => {
@@ -84,54 +81,47 @@ export default function Import() {
           onDrop={(event) => {
             event.preventDefault()
             setDragging(false)
-            pick(event.dataTransfer.files?.[0])
+            upload(event.dataTransfer.files?.[0])
           }}
           sx={{
-            borderRadius: 4,
-            borderStyle: 'dashed',
-            borderWidth: 2,
-            borderColor: dragging ? 'primary.main' : 'divider',
-            bgcolor: (theme) => (dragging ? alpha(theme.palette.primary.main, 0.06) : 'transparent'),
-            p: { xs: 4, md: 6 },
+            display: 'grid',
+            placeItems: 'center',
+            minHeight: 280,
+            p: { xs: 3, md: 5 },
             textAlign: 'center',
+            borderStyle: 'dashed',
+            borderColor: dragging ? 'primary.main' : 'text.secondary',
+            bgcolor: (theme) => (dragging ? alpha(theme.palette.primary.main, 0.06) : 'transparent'),
             transition: 'border-color 150ms ease, background-color 150ms ease',
           }}
         >
           {busy ? (
-            <Stack alignItems="center" spacing={2}>
-              <CircularProgress size={36} />
+            <Stack spacing={2} sx={{ alignItems: 'center', width: '100%' }}>
               <Typography variant="body2" color="text.secondary">
                 Importing {file?.name}...
               </Typography>
-              <LinearProgress sx={{ width: '60%' }} />
+              <LinearProgress sx={{ width: '60%', maxWidth: 280 }} />
             </Stack>
           ) : (
-            <Stack alignItems="center" spacing={1.5}>
-              <Box
-                aria-hidden
-                sx={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: '50%',
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: 'primary.main',
-                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
-                }}
-              >
-                <UploadFileIcon />
-              </Box>
-              <Typography variant="subtitle1">{file ? file.name : 'Drop your CSV here'}</Typography>
-              <Typography variant="body2" color="text.secondary">
-                or choose a file from your computer
+            <Stack spacing={1.25} sx={{ alignItems: 'center' }}>
+              <UploadFileIcon sx={{ fontSize: 32, color: 'text.secondary' }} aria-hidden />
+              <Typography variant="h5" component="p">
+                {file ? file.name : 'Drop your statement here'}
               </Typography>
-              <Button variant="contained" component="label">
+              <Typography variant="body2" color="text.secondary">
+                {file ? 'Drop another file, or choose one to import again.' : 'A .csv file, up to 5 MB and 10,000 rows.'}
+              </Typography>
+              <Button variant="contained" component="label" sx={{ mt: 1 }}>
                 Choose file
                 <input
                   hidden
                   type="file"
                   accept=".csv,text/csv"
-                  onChange={(event) => pick(event.target.files?.[0])}
+                  onChange={(event) => {
+                    upload(event.target.files?.[0])
+                    // without this, picking the same file again does not fire a change event
+                    event.target.value = ''
+                  }}
                 />
               </Button>
             </Stack>
@@ -139,33 +129,42 @@ export default function Import() {
         </Paper>
 
         <SectionCard title="Expected format" subtitle="Column order does not matter">
-          <Paper
-            variant="outlined"
+          <Box
+            component="pre"
             sx={{
+              ...mono,
+              m: 0,
               p: 1.5,
-              borderRadius: 2,
+              fontSize: '0.75rem',
+              lineHeight: 1.7,
+              borderRadius: 1,
               bgcolor: 'action.hover',
               overflowX: 'auto',
             }}
           >
-            <Typography component="pre" variant="caption" sx={{ m: 0, fontFamily: 'monospace' }}>
-              {SAMPLE}
-            </Typography>
-          </Paper>
+            {SAMPLE}
+          </Box>
           <Button
             size="small"
-            startIcon={<ContentCopyIcon />}
+            variant="outlined"
             sx={{ mt: 1.5 }}
-            onClick={() => {
-              navigator.clipboard?.writeText(SAMPLE)
-              notify('Sample copied to clipboard')
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(SAMPLE)
+                notify('Sample copied to clipboard')
+              } catch {
+                notify('Could not copy. Select the text and copy it by hand.', 'error')
+              }
             }}
           >
             Copy sample
           </Button>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-            Needs date, description and amount columns. Extra columns are ignored and reported back.
-            Set up <Link to="/categories">keyword rules</Link> first so rows land in the right category.
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Needs date, description and amount columns. Extra columns are ignored and reported back. Set up{' '}
+            <MuiLink component={Link} to="/categories">
+              keyword rules
+            </MuiLink>{' '}
+            first so rows land in the right category.
           </Typography>
         </SectionCard>
       </Box>
@@ -173,44 +172,41 @@ export default function Import() {
       {summary && (
         <SectionCard
           title="Import summary"
+          subtitle={file?.name}
+          flush
           action={
-            <Button component={Link} to="/transactions" size="small">
+            <Button component={Link} to="/transactions" size="small" color="inherit" sx={{ color: 'text.secondary', mr: -1 }}>
               View transactions
             </Button>
           }
         >
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: { xs: 'repeat(3, 1fr)' },
-              mb: summary.rowErrors?.length || summary.ignoredColumns?.length ? 2 : 0,
-            }}
-          >
-            <Figure tone="success" icon={CheckCircleIcon} label="Imported" value={summary.imported} />
-            <Figure tone="warning" label="Duplicates skipped" value={summary.duplicates} />
-            <Figure tone="error" icon={summary.failed ? ErrorOutlineIcon : undefined} label="Rows failed" value={summary.failed} />
+          <Box sx={{ '& > *': { border: 0, borderRadius: 0 } }}>
+            <StatStrip columns={3}>
+              <StatCard label="Imported" value={summary.imported} tone={summary.imported ? 'success' : undefined} caption="New transactions" />
+              <StatCard label="Duplicates" value={summary.duplicates} caption="Already in your ledger, skipped" />
+              <StatCard label="Failed" value={summary.failed} tone={summary.failed ? 'error' : undefined} caption="Rows that could not be read" />
+            </StatStrip>
           </Box>
 
           {summary.ignoredColumns?.length > 0 && (
-            <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ px: 2.5, py: 1.5, borderTop: 1, borderColor: 'divider' }}>
               Ignored columns: {summary.ignoredColumns.join(', ')}
-            </Alert>
+            </Typography>
           )}
 
           {summary.rowErrors?.length > 0 && (
-            <TableContainer sx={{ overflowX: 'auto' }}>
+            <TableContainer sx={{ overflowX: 'auto', borderTop: 1, borderColor: 'divider' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Row</TableCell>
+                    <TableCell sx={{ width: 80 }}>Line</TableCell>
                     <TableCell>Problem</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {summary.rowErrors.map((rowError) => (
-                    <TableRow key={rowError.row}>
-                      <TableCell>{rowError.row}</TableCell>
+                    <TableRow key={rowError.row} sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                      <TableCell sx={mono}>{rowError.row}</TableCell>
                       <TableCell>{rowError.message}</TableCell>
                     </TableRow>
                   ))}
@@ -221,29 +217,5 @@ export default function Import() {
         </SectionCard>
       )}
     </Stack>
-  )
-}
-
-function Figure({ tone, icon: Icon, label, value }) {
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        borderRadius: 3,
-        borderColor: (theme) => alpha(theme.palette[tone].main, 0.3),
-        bgcolor: (theme) => alpha(theme.palette[tone].main, theme.palette.mode === 'dark' ? 0.12 : 0.06),
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center">
-        {Icon && <Icon fontSize="small" color={tone} />}
-        <Typography variant="h5" color={`${tone}.main`}>
-          {value}
-        </Typography>
-      </Stack>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-    </Paper>
   )
 }

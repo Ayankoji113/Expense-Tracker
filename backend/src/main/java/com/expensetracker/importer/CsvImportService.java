@@ -3,6 +3,7 @@ package com.expensetracker.importer;
 import com.expensetracker.category.CategoryRepository;
 import com.expensetracker.category.CategoryRuleRepository;
 import com.expensetracker.common.BadRequestException;
+import com.expensetracker.common.Dates;
 import com.expensetracker.expense.Expense;
 import com.expensetracker.expense.ExpenseRepository;
 import com.opencsv.CSVReader;
@@ -44,6 +45,9 @@ public class CsvImportService {
             DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH));
 
     private static final int MAX_ROWS = 10_000;
+    private static final int MAX_DESCRIPTION = 255;
+    // numeric(12,2)
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999.99");
 
     private final ExpenseRepository expenses;
     private final CategoryRepository categories;
@@ -73,6 +77,7 @@ public class CsvImportService {
             Columns columns = Columns.from(header, ignoredColumns);
             Rules keywordRules = rulesFor(userId);
             Long fallback = categories.findBuiltIn("Uncategorized").map(c -> c.getId()).orElse(null);
+            LocalDate latestDate = Dates.latestToday();
 
             String[] row;
             int lineNumber = 1;
@@ -86,10 +91,18 @@ public class CsvImportService {
                 }
                 try {
                     LocalDate date = parseDate(columns.value(row, columns.date()));
+                    if (date.isAfter(latestDate)) {
+                        throw new IllegalArgumentException("date " + date + " is in the future");
+                    }
                     BigDecimal amount = parseAmount(columns.value(row, columns.amount()));
                     String description = columns.value(row, columns.description()).trim();
                     if (description.isEmpty()) {
                         throw new IllegalArgumentException("description is empty");
+                    }
+                    // the column would reject it, and a database error fails the whole file, not the row
+                    if (description.length() > MAX_DESCRIPTION) {
+                        throw new IllegalArgumentException(
+                                "description is longer than " + MAX_DESCRIPTION + " characters");
                     }
                     if (expenses.existsByUserIdAndSpentOnAndAmountAndDescriptionIgnoreCase(userId, date, amount,
                             description)) {
@@ -129,9 +142,9 @@ public class CsvImportService {
         throw new IllegalArgumentException("unrecognised date '" + value + "'");
     }
 
-    /** Accepts 12.34, "1,234.56", currency-prefixed and (12.34)/-12.34 debit forms. */
+    /** Accepts 12.34, "1,234.56", currency-prefixed (₹, Rs., INR, $, £, €) and (12.34)/-12.34 debit forms. */
     static BigDecimal parseAmount(String raw) {
-        String value = raw.trim().replaceAll("[\\s,$\\u00A3\\u20AC]", "");
+        String value = raw.trim().replaceAll("(?i)[\\s,$\\u00A3\\u20AC\\u20B9]|rs\\.?|inr", "");
         if (value.startsWith("(") && value.endsWith(")")) {
             value = value.substring(1, value.length() - 1);
         }
@@ -144,6 +157,9 @@ public class CsvImportService {
         amount = amount.abs().setScale(2, RoundingMode.HALF_UP);
         if (amount.signum() == 0) {
             throw new IllegalArgumentException("amount is zero");
+        }
+        if (amount.compareTo(MAX_AMOUNT) > 0) {
+            throw new IllegalArgumentException("amount '" + raw.trim() + "' is too large");
         }
         return amount;
     }

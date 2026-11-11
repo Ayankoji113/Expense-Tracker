@@ -1,71 +1,85 @@
-import TrendingDownIcon from '@mui/icons-material/TrendingDown'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
-import { alpha } from '@mui/material/styles'
+import { Box, Paper, Skeleton, Typography } from '@mui/material'
+import { mono } from '../../theme'
 
 /**
- * Tinted icon chip + large value + optional trend. `tone` picks the semantic colour
- * (income green, expense red, balance blue, analytics purple) and everything else follows.
+ * A row of headline figures in one ruled panel, like the totals line of a statement. The 1px gap
+ * over a divider-coloured background draws the rules between cells at every breakpoint.
  */
-export default function StatCard({ tone = 'primary', icon: Icon, label, value, caption, change, invertChange }) {
-  const trendUp = change !== null && change !== undefined && Number(change) >= 0
+export function StatStrip({ children, columns = 4 }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        display: 'grid',
+        gap: '1px',
+        overflow: 'hidden',
+        bgcolor: 'divider',
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', lg: `repeat(${columns}, 1fr)` },
+        // an odd one out at the end fills its row rather than leaving a hole
+        '& > :last-child:nth-of-type(odd)': { gridColumn: { xs: '1 / -1', lg: 'auto' } },
+      }}
+    >
+      {children}
+    </Paper>
+  )
+}
+
+/**
+ * Label, figure, and either a change against the previous period or a caption.
+ * `tone` colours the figure only when it carries meaning (a negative balance, say).
+ */
+export default function StatCard({ label, value, caption, change, invertChange, tone, numeric = true }) {
+  const hasChange = change !== null && change !== undefined
+  const up = hasChange && Number(change) >= 0
   // spending more is bad news, earning more is good news
-  const trendGood = invertChange ? !trendUp : trendUp
+  const good = invertChange ? !up : up
 
   return (
-    <Card sx={{ height: '100%', '&:hover': { boxShadow: (theme) => theme.shadows[2] } }}>
-      <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box
-            aria-hidden
-            sx={{
-              width: 42,
-              height: 42,
-              flexShrink: 0,
-              borderRadius: 2.5,
-              display: 'grid',
-              placeItems: 'center',
-              color: `${tone}.main`,
-              bgcolor: (theme) => alpha(theme.palette[tone].main, theme.palette.mode === 'dark' ? 0.18 : 0.1),
-            }}
-          >
-            <Icon fontSize="small" />
-          </Box>
-          <Typography variant="body2" color="text.secondary" noWrap>
-            {label}
-          </Typography>
-        </Stack>
+    <Box sx={{ bgcolor: 'background.paper', p: { xs: 2, md: 2.5 }, minWidth: 0 }}>
+      <Typography variant="overline" component="p" color="text.secondary" noWrap>
+        {label}
+      </Typography>
+      <Typography
+        component="p"
+        sx={{
+          ...(numeric ? mono : { fontFamily: (theme) => theme.typography.h4.fontFamily }),
+          mt: 0.75,
+          fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.75rem' },
+          fontWeight: 500,
+          lineHeight: 1.2,
+          letterSpacing: '-0.03em',
+          overflowWrap: 'anywhere',
+          color: tone ? `${tone}.main` : 'text.primary',
+        }}
+      >
+        {value}
+      </Typography>
+      <Typography variant="caption" component="p" sx={{ mt: 0.75, minHeight: 20 }}>
+        {hasChange ? (
+          <>
+            <Box component="span" sx={{ ...mono, fontWeight: 600, color: good ? 'success.main' : 'error.main' }}>
+              {up ? '↑' : '↓'} {Math.abs(Number(change)).toFixed(1)}%
+            </Box>{' '}
+            vs previous period
+          </>
+        ) : (
+          caption
+        )}
+      </Typography>
+    </Box>
+  )
+}
 
-        <Typography
-          variant="h4"
-          sx={{ mt: 1.5, fontSize: { xs: '1.5rem', md: '1.75rem' }, wordBreak: 'break-word' }}
-        >
-          {value}
-        </Typography>
-
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5, minHeight: 22 }}>
-          {change !== null && change !== undefined ? (
-            <>
-              {trendUp ? (
-                <TrendingUpIcon fontSize="inherit" color={trendGood ? 'success' : 'error'} />
-              ) : (
-                <TrendingDownIcon fontSize="inherit" color={trendGood ? 'success' : 'error'} />
-              )}
-              <Typography variant="caption" color={trendGood ? 'success.main' : 'error.main'} fontWeight={600}>
-                {trendUp ? '+' : ''}
-                {Number(change).toFixed(1)}%
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                vs previous period
-              </Typography>
-            </>
-          ) : (
-            <Typography variant="caption" color="text.secondary">
-              {caption}
-            </Typography>
-          )}
-        </Stack>
-      </CardContent>
-    </Card>
+export function StatStripSkeleton({ count = 4 }) {
+  return (
+    <StatStrip columns={count}>
+      {Array.from({ length: count }, (_, index) => (
+        <Box key={index} sx={{ bgcolor: 'background.paper', p: { xs: 2, md: 2.5 } }}>
+          <Skeleton width="45%" height={16} />
+          <Skeleton width="75%" height={38} sx={{ mt: 0.5 }} />
+          <Skeleton width="55%" height={16} />
+        </Box>
+      ))}
+    </StatStrip>
   )
 }

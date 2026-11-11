@@ -1,5 +1,6 @@
 package com.expensetracker.report;
 
+import com.expensetracker.common.Dates;
 import com.expensetracker.expense.Expense.Kind;
 import com.expensetracker.expense.ExpenseRepository;
 import com.expensetracker.report.ReportController.CategorySlice;
@@ -29,7 +30,7 @@ public class ReportService {
 
     public Summary summary(Long userId, LocalDate from, LocalDate to) {
         LocalDate start = from == null ? EPOCH : from;
-        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate end = to == null ? Dates.latestToday() : to;
 
         BigDecimal income = expenses.totalBetween(userId, Kind.INCOME, start, end);
         BigDecimal expense = expenses.totalBetween(userId, Kind.EXPENSE, start, end);
@@ -38,7 +39,9 @@ public class ReportService {
 
         BigDecimal averageExpense = expenseCount == 0 ? BigDecimal.ZERO
                 : expense.divide(BigDecimal.valueOf(expenseCount), 2, RoundingMode.HALF_UP);
-        long days = Math.max(1, ChronoUnit.DAYS.between(start, end) + 1);
+        // days that have not happened yet cannot have spending, so they must not dilute the average
+        LocalDate today = LocalDate.now();
+        long days = Math.max(1, ChronoUnit.DAYS.between(start, end.isAfter(today) ? today : end) + 1);
         BigDecimal averageDaily = start.equals(EPOCH) ? averageExpense
                 : expense.divide(BigDecimal.valueOf(days), 2, RoundingMode.HALF_UP);
 
@@ -61,7 +64,7 @@ public class ReportService {
 
     public List<CategorySlice> byCategory(Long userId, LocalDate from, LocalDate to) {
         LocalDate start = from == null ? EPOCH : from;
-        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate end = to == null ? Dates.latestToday() : to;
         List<CategoryTotal> totals = expenses.totalsByCategory(userId, Kind.EXPENSE, start, end);
         BigDecimal grand = totals.stream().map(CategoryTotal::total).reduce(BigDecimal.ZERO, BigDecimal::add);
         return totals.stream()
@@ -79,7 +82,7 @@ public class ReportService {
     }
 
     public List<DailyPoint> daily(Long userId, LocalDate from, LocalDate to) {
-        LocalDate end = to == null ? LocalDate.now() : to;
+        LocalDate end = to == null ? Dates.latestToday() : to;
         LocalDate start = from == null ? end.minusDays(29) : from;
         return expenses.totalsByDay(userId, start, end).stream()
                 .map(d -> new DailyPoint(d.getDay(), d.getExpense()))

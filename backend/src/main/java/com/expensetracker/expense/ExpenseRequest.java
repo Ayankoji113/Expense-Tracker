@@ -7,7 +7,8 @@ import java.time.LocalDate;
 
 public record ExpenseRequest(
         @NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
-        @NotNull @PastOrPresent LocalDate spentOn,
+        // "not in the future" depends on the user's timezone, so the service checks it
+        @NotNull LocalDate spentOn,
         @NotBlank @Size(max = 255) String description,
         Long categoryId,
         Kind kind) {

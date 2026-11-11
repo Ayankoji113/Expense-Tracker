@@ -30,7 +30,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
               and e.spentOn between :from and :to
               and e.kind in :kinds
               and (:categoryId is null or e.categoryId = :categoryId)
-              and lower(e.description) like lower(:q)
+              and lower(e.description) like lower(:q) escape '!'
             """)
     Page<Expense> search(@Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to,
             @Param("kinds") Collection<Expense.Kind> kinds, @Param("categoryId") Long categoryId,
@@ -62,7 +62,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("""
             select new com.expensetracker.report.CategoryTotal(
-                     coalesce(c.name, 'Uncategorized'), coalesce(c.color, '#64748B'), sum(e.amount), count(e))
+                     coalesce(c.name, 'Uncategorized'), coalesce(c.color, '#8A857A'), sum(e.amount), count(e))
             from Expense e left join Category c on c.id = e.categoryId
             where e.userId = :userId and e.kind = :kind and e.spentOn between :from and :to
             group by c.name, c.color

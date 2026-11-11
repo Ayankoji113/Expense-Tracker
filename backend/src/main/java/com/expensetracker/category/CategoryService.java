@@ -35,7 +35,7 @@ public class CategoryService {
         if (taken) {
             throw new BadRequestException("Category " + name + " already exists");
         }
-        String color = request.color() == null ? "#888888" : request.color();
+        String color = request.color() == null ? "#8A857A" : request.color();
         return toDto(categories.save(new Category(userId, name, color)));
     }
 

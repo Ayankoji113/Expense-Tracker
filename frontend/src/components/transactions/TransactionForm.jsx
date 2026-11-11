@@ -16,15 +16,15 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { useEffect, useState } from 'react'
 import client, { errorMessage } from '../../api/client'
+import { today } from '../../utils/format'
 
-const today = () => new Date().toISOString().slice(0, 10)
-const EMPTY = { amount: '', spentOn: today(), description: '', categoryId: '', kind: 'EXPENSE' }
+const emptyForm = () => ({ amount: '', spentOn: today(), description: '', categoryId: '', kind: 'EXPENSE' })
 
 /** Full-screen sheet on mobile, dialog on desktop. */
 export default function TransactionForm({ transaction, categories, onClose, onSaved }) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
-  const [form, setForm] = useState(EMPTY)
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [busy, setBusy] = useState(false)
@@ -93,9 +93,7 @@ export default function TransactionForm({ transaction, categories, onClose, onSa
               onChange={(_, value) => value && setForm({ ...form, kind: value })}
               aria-label="Transaction type"
             >
-              <ToggleButton value="EXPENSE" color="error">
-                Expense
-              </ToggleButton>
+              <ToggleButton value="EXPENSE">Expense</ToggleButton>
               <ToggleButton value="INCOME" color="success">
                 Income
               </ToggleButton>
@@ -123,6 +121,7 @@ export default function TransactionForm({ transaction, categories, onClose, onSa
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               error={Boolean(fieldErrors.description)}
               helperText={fieldErrors.description || 'What was this for?'}
+              slotProps={{ htmlInput: { maxLength: 255 } }}
             />
 
             <TextField
@@ -152,8 +151,8 @@ export default function TransactionForm({ transaction, categories, onClose, onSa
             />
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} disabled={busy}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={onClose} disabled={busy} color="inherit">
             Cancel
           </Button>
           <Button type="submit" variant="contained" disabled={busy}>
